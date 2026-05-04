@@ -1,0 +1,23 @@
+.DS_Store
+
+# Python
+backend/.venv/
+backend/.venv-train/
+backend/.pytest_cache/
+backend/**/__pycache__/
+backend/*.egg-info/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Experiments
+experiments/*.npz
+experiments/*.pt
+experiments/*.pth
+experiments/*.gif
+experiments/**/*.png
+
+
+TODO.md 
+agents.md
