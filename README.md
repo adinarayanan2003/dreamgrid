@@ -131,6 +131,13 @@ cd backend
 python -m dreamgrid.evaluate --learned-rollouts --episodes 20 --rollout-horizons 1 3 5 10
 ```
 
+Evaluate held-out splits and stress scenarios:
+
+```bash
+cd backend
+python -m dreamgrid.evaluate --heldout --episodes-per-split 6 --scenarios nominal moving_hazards
+```
+
 Run API/backend tests:
 
 ```bash

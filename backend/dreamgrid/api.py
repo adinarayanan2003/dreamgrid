@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from dreamgrid.env import GridRescueEnv
 from dreamgrid.evaluate import evaluate
+from dreamgrid.heldout import DEFAULT_HELDOUT_SCENARIOS, DEFAULT_HELDOUT_SPLITS, evaluate_heldout
 from dreamgrid.model import (
     ModelCheckpointUnavailableError,
     TorchUnavailableError,
@@ -84,6 +85,29 @@ class RolloutMetricsRequest(BaseModel):
         min_length=1,
         max_length=8,
     )
+    model_path: str | None = None
+
+
+class HeldoutEvalRequest(BaseModel):
+    planners: list[Literal["random", "astar", "random_shooting", "cem", "learned_mpc"]] = Field(
+        default_factory=lambda: ["astar", "cem", "learned_mpc"]
+    )
+    episodes_per_split: int = Field(default=3, ge=1, le=25)
+    grid_size: int = Field(default=16, ge=8, le=32)
+    splits: list[Literal["validation", "test"]] = Field(
+        default_factory=lambda: list(DEFAULT_HELDOUT_SPLITS)
+    )
+    scenarios: list[Literal["nominal", "dense_walls", "moving_hazards"]] = Field(
+        default_factory=lambda: list(DEFAULT_HELDOUT_SCENARIOS)
+    )
+    horizon: int = Field(default=6, ge=1, le=32)
+    num_candidates: int = Field(default=48, ge=8, le=2048)
+    rollout_horizons: list[int] = Field(
+        default_factory=lambda: list(DEFAULT_ROLLOUT_HORIZONS),
+        min_length=1,
+        max_length=8,
+    )
+    include_learned_rollouts: bool = True
     model_path: str | None = None
 
 
@@ -318,6 +342,30 @@ def run_learned_rollout_eval(request: RolloutMetricsRequest) -> dict:
             horizons=request.horizons,
             grid_size=request.grid_size,
             seed=request.seed,
+            model_path=request.model_path,
+        )
+    except TorchUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ModelCheckpointUnavailableError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"metrics": metrics}
+
+
+@app.post("/api/eval/heldout")
+def run_heldout_eval(request: HeldoutEvalRequest) -> dict:
+    try:
+        metrics = evaluate_heldout(
+            planners=list(request.planners),
+            episodes_per_split=request.episodes_per_split,
+            grid_size=request.grid_size,
+            splits=list(request.splits),
+            scenarios=list(request.scenarios),
+            horizon=request.horizon,
+            num_candidates=request.num_candidates,
+            rollout_horizons=request.rollout_horizons,
+            include_learned_rollouts=request.include_learned_rollouts,
             model_path=request.model_path,
         )
     except TorchUnavailableError as exc:
