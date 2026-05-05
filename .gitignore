@@ -14,6 +14,7 @@ frontend/dist/
 # Experiments
 experiments/*.npz
 experiments/*.pt
+!experiments/world_model_v3_50ep.pt
 experiments/*.pth
 experiments/*.gif
 experiments/**/*.png

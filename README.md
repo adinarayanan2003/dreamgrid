@@ -38,12 +38,13 @@ Implemented:
 
 Limitations:
 
-- The dashboard/planners still use the true simulator for rollouts.
-- The trained checkpoint is not yet wired into API-driven learned rollouts or learned MPC.
+- Classical planners still use the true simulator for rollout scoring.
+- Learned rollouts and learned MPC require PyTorch plus a local checkpoint.
+- Oracle-vs-learned aggregate rollout metrics are still pending.
 
 ## Results Snapshot
 
-Generated training artifacts are ignored by git. The latest recorded run produced:
+Generated training artifacts are ignored by git except for the published Git LFS checkpoint. The latest recorded run produced:
 
 | Artifact | Value |
 | --- | --- |
@@ -55,6 +56,8 @@ Generated training artifacts are ignored by git. The latest recorded run produce
 | Final reward MAE | `0.01667` |
 | Final done accuracy | `0.986` |
 | Best validation loss epoch | `17` |
+
+The trained checkpoint is tracked with Git LFS at `experiments/world_model_v3_50ep.pt`.
 
 See [docs/RESEARCH.md](docs/RESEARCH.md) for methodology, results, and limitations.
 
@@ -77,6 +80,12 @@ uvicorn dreamgrid.api:app --reload --port 8000
 ```
 
 Add the `train` extra when you want to train the PyTorch latent world model.
+
+Learned rollout endpoints and `learned_mpc` use `experiments/world_model_v3_50ep.pt` by default. Override it with:
+
+```bash
+export DREAMGRID_MODEL_PATH=/path/to/world_model.pt
+```
 
 Frontend:
 
@@ -137,4 +146,4 @@ npm run build
 - [Contributing](CONTRIBUTING.md)
 - [TODO](TODO.md)
 
-Experiment datasets, checkpoints, and sample images are ignored by git. Regenerate them with the commands above, or publish them separately as release artifacts if needed.
+Experiment datasets and sample images are ignored by git. The published checkpoint is stored with Git LFS; run `git lfs pull` if your clone does not download it automatically.
