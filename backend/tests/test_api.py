@@ -119,3 +119,41 @@ def test_learned_rollout_eval_rejects_invalid_horizon() -> None:
     )
 
     assert response.status_code == 400
+
+
+def test_heldout_eval_runs_without_learned_rollouts() -> None:
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/eval/heldout",
+        json={
+            "planners": ["astar"],
+            "episodes_per_split": 1,
+            "splits": ["validation"],
+            "scenarios": ["moving_hazards"],
+            "include_learned_rollouts": False,
+        },
+    )
+
+    assert response.status_code == 200
+    scenario = response.json()["metrics"]["splits"]["validation"]["scenarios"]["moving_hazards"]
+    assert scenario["config"]["hazard_count"] == 6
+    assert scenario["learned_rollouts"] is None
+
+
+def test_heldout_eval_returns_404_for_missing_checkpoint(monkeypatch) -> None:
+    monkeypatch.setenv("DREAMGRID_MODEL_PATH", "/tmp/does-not-exist-dreamgrid-env.pt")
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/eval/heldout",
+        json={
+            "planners": ["astar"],
+            "episodes_per_split": 1,
+            "splits": ["validation"],
+            "scenarios": ["nominal"],
+            "include_learned_rollouts": True,
+        },
+    )
+
+    assert response.status_code == 404

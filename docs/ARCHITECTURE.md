@@ -84,6 +84,7 @@ FastAPI endpoints:
 | `POST /api/models/predict-rollout` | compare multi-step learned rollout drift with simulator truth |
 | `POST /api/eval/run` | compare planners across episodes |
 | `POST /api/eval/learned-rollouts` | aggregate oracle-vs-learned rollout metrics by horizon |
+| `POST /api/eval/heldout` | evaluate planners and optional learned drift on held-out seed splits |
 
 Learned-model endpoints and `learned_mpc` resolve checkpoints in this order:
 
@@ -92,6 +93,8 @@ Learned-model endpoints and `learned_mpc` resolve checkpoints in this order:
 3. `experiments/world_model_v3_50ep.pt`
 
 Missing checkpoints return an unavailable response instead of falling back to simulator rollouts.
+
+Held-out evaluation uses fixed seed ranges for `validation` and `test` splits, plus scenario configs for nominal maps, denser walls, and higher moving-hazard pressure. This keeps training-time smoke metrics separate from generalization checks.
 
 ### Dashboard
 

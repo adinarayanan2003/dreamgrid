@@ -19,6 +19,8 @@ def evaluate_learned_rollouts(
     grid_size: int = 16,
     seed: int = 0,
     max_steps: int | None = None,
+    hazard_count: int = 3,
+    wall_density: float = 0.16,
     model_path: str | Path | None = None,
 ) -> dict:
     normalized_horizons = _normalize_horizons(horizons)
@@ -29,7 +31,12 @@ def evaluate_learned_rollouts(
     rows: dict[int, list[dict[str, float]]] = {horizon: [] for horizon in normalized_horizons}
 
     for episode_idx in range(episodes):
-        env = GridRescueEnv(grid_size=grid_size, max_steps=max_steps)
+        env = GridRescueEnv(
+            grid_size=grid_size,
+            max_steps=max_steps,
+            hazard_count=hazard_count,
+            wall_density=wall_density,
+        )
         env.reset(seed=seed + episode_idx)
         current_obs = env.render()
         expected_size = model.config.image_size
@@ -76,6 +83,8 @@ def evaluate_learned_rollouts(
         "episodes": episodes,
         "grid_size": grid_size,
         "seed": seed,
+        "hazard_count": hazard_count,
+        "wall_density": wall_density,
         "action_policy": "seeded_random",
         "horizons": {
             horizon: {
@@ -125,6 +134,8 @@ def main() -> None:
     parser.add_argument("--episodes", type=int, default=20)
     parser.add_argument("--grid-size", type=int, default=16)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--hazard-count", type=int, default=3)
+    parser.add_argument("--wall-density", type=float, default=0.16)
     parser.add_argument("--horizons", nargs="+", type=int, default=list(DEFAULT_ROLLOUT_HORIZONS))
     parser.add_argument("--model-path", default=None)
     args = parser.parse_args()
@@ -133,6 +144,8 @@ def main() -> None:
         horizons=args.horizons,
         grid_size=args.grid_size,
         seed=args.seed,
+        hazard_count=args.hazard_count,
+        wall_density=args.wall_density,
         model_path=args.model_path,
     )
     for horizon, metrics in summary["horizons"].items():
