@@ -5,6 +5,7 @@ from collections import defaultdict
 
 from dreamgrid.env import GridRescueEnv
 from dreamgrid.planners import make_planner
+from dreamgrid.rollout_metrics import DEFAULT_ROLLOUT_HORIZONS, evaluate_learned_rollouts
 
 
 def evaluate(
@@ -61,6 +62,11 @@ def evaluate(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate DreamGrid planners.")
     parser.add_argument(
+        "--learned-rollouts",
+        action="store_true",
+        help="evaluate learned rollout drift against simulator truth instead of planner scores",
+    )
+    parser.add_argument(
         "--planners",
         nargs="+",
         default=["random", "astar", "random_shooting", "cem", "learned_mpc"],
@@ -70,7 +76,21 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--horizon", type=int, default=6)
     parser.add_argument("--num-candidates", type=int, default=48)
+    parser.add_argument("--rollout-horizons", nargs="+", type=int, default=list(DEFAULT_ROLLOUT_HORIZONS))
+    parser.add_argument("--model-path", default=None)
     args = parser.parse_args()
+    if args.learned_rollouts:
+        summary = evaluate_learned_rollouts(
+            episodes=args.episodes,
+            horizons=args.rollout_horizons,
+            grid_size=args.grid_size,
+            seed=args.seed,
+            model_path=args.model_path,
+        )
+        for horizon, metrics in summary["horizons"].items():
+            print(f"horizon={horizon}", metrics)
+        return
+
     summary = evaluate(
         args.planners,
         args.episodes,

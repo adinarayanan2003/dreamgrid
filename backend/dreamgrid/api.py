@@ -23,6 +23,7 @@ from dreamgrid.model import (
     require_torch,
 )
 from dreamgrid.planners import PlanCandidate, make_planner
+from dreamgrid.rollout_metrics import DEFAULT_ROLLOUT_HORIZONS, evaluate_learned_rollouts
 from dreamgrid.types import ACTION_NAMES
 
 
@@ -72,6 +73,18 @@ class EvalRequest(BaseModel):
     seed: int = 100
     horizon: int = Field(default=6, ge=1, le=32)
     num_candidates: int = Field(default=48, ge=8, le=2048)
+
+
+class RolloutMetricsRequest(BaseModel):
+    episodes: int = Field(default=12, ge=1, le=100)
+    grid_size: int = Field(default=16, ge=8, le=32)
+    seed: int = 200
+    horizons: list[int] = Field(
+        default_factory=lambda: list(DEFAULT_ROLLOUT_HORIZONS),
+        min_length=1,
+        max_length=8,
+    )
+    model_path: str | None = None
 
 
 app = FastAPI(title="DreamGrid API", version="0.1.0")
@@ -294,6 +307,25 @@ def run_eval(request: EvalRequest) -> dict:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ModelCheckpointUnavailableError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"metrics": metrics}
+
+
+@app.post("/api/eval/learned-rollouts")
+def run_learned_rollout_eval(request: RolloutMetricsRequest) -> dict:
+    try:
+        metrics = evaluate_learned_rollouts(
+            episodes=request.episodes,
+            horizons=request.horizons,
+            grid_size=request.grid_size,
+            seed=request.seed,
+            model_path=request.model_path,
+        )
+    except TorchUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ModelCheckpointUnavailableError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"metrics": metrics}
 
 

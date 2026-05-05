@@ -124,6 +124,13 @@ cd backend
 python -m dreamgrid.evaluate --episodes 25 --grid-size 16
 ```
 
+Evaluate learned rollout drift:
+
+```bash
+cd backend
+python -m dreamgrid.evaluate --learned-rollouts --episodes 20 --rollout-horizons 1 3 5 10
+```
+
 Run API/backend tests:
 
 ```bash

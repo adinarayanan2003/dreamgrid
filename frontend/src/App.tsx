@@ -7,12 +7,14 @@ import {
   PlanCandidate,
   PlannerName,
   PredictionPayload,
+  RolloutEvalMetrics,
   RolloutPredictionPayload,
   createEpisode,
   planEpisode,
   predictNext,
   predictRollout,
   runEval,
+  runRolloutEval,
   stepEpisode
 } from './api';
 
@@ -29,6 +31,7 @@ export function App() {
   const [planner, setPlanner] = useState<PlannerName>('cem');
   const [plan, setPlan] = useState<PlanCandidate[]>([]);
   const [metrics, setMetrics] = useState<EvalMetrics>({});
+  const [rolloutMetrics, setRolloutMetrics] = useState<RolloutEvalMetrics | null>(null);
   const [prediction, setPrediction] = useState<PredictionPayload | null>(null);
   const [rolloutPrediction, setRolloutPrediction] = useState<RolloutPredictionPayload | null>(null);
   const [seed, setSeed] = useState(7);
@@ -102,6 +105,12 @@ export function App() {
       setMetrics(payload.metrics);
     } catch {
       setMetrics({});
+    }
+    try {
+      const payload = await runRolloutEval();
+      setRolloutMetrics(payload.metrics);
+    } catch {
+      setRolloutMetrics(null);
     }
   }
 
@@ -291,6 +300,7 @@ export function App() {
             </button>
           </div>
           <div className="metric-table">
+            <div className="metric-section-title">Planner Scores</div>
             {Object.entries(metrics).map(([name, row]) => (
               <div className="metric-row" key={name}>
                 <strong>{plannerLabels[name as PlannerName] ?? name}</strong>
@@ -299,6 +309,21 @@ export function App() {
               </div>
             ))}
             {Object.keys(metrics).length === 0 && <div className="empty">No metrics</div>}
+          </div>
+          <div className="rollout-metric-table">
+            <div className="metric-section-title">Learned Drift</div>
+            {rolloutMetrics ? (
+              Object.entries(rolloutMetrics.horizons).map(([horizon, row]) => (
+                <div className="rollout-metric-row" key={horizon}>
+                  <strong>H{horizon}</strong>
+                  <span>{row.frame_mse.toFixed(4)} mse</span>
+                  <span>{row.reward_mae.toFixed(3)} mae</span>
+                  <span>{Math.round(row.done_accuracy * 100)}%</span>
+                </div>
+              ))
+            ) : (
+              <div className="empty">No drift metrics</div>
+            )}
           </div>
         </aside>
       </section>

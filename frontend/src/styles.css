@@ -401,6 +401,21 @@ button:disabled {
   gap: 8px;
 }
 
+.rollout-metric-table {
+  border-top: 1px solid #e2e8f0;
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+}
+
+.metric-section-title {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 .metric-row {
   align-items: center;
   border-bottom: 1px solid #e2e8f0;
@@ -416,6 +431,25 @@ button:disabled {
 }
 
 .metric-row span {
+  color: #475569;
+  text-align: right;
+}
+
+.rollout-metric-row {
+  align-items: center;
+  border-bottom: 1px solid #e2e8f0;
+  display: grid;
+  font-size: 12px;
+  gap: 7px;
+  grid-template-columns: 34px 1fr 1fr 44px;
+  padding: 9px 0;
+}
+
+.rollout-metric-row:last-child {
+  border-bottom: 0;
+}
+
+.rollout-metric-row span {
   color: #475569;
   text-align: right;
 }
