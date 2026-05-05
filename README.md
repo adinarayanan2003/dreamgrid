@@ -142,6 +142,17 @@ python -m dreamgrid.evaluate --heldout \
   --out-csv ../experiments/heldout.csv
 ```
 
+Replay one held-out failure case:
+
+```bash
+cd backend
+python -m dreamgrid.heldout --replay \
+  --split validation \
+  --scenario moving_hazards \
+  --seed 10000 \
+  --planner astar
+```
+
 Run API/backend tests:
 
 ```bash

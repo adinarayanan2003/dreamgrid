@@ -26,6 +26,7 @@ DreamGrid currently has a complete simulator/planner/dashboard MVP plus a traine
 - [x] Add oracle-vs-learned-model rollout comparison.
 - [x] Evaluate on held-out map splits and moving hazard scenarios.
 - [x] Export metrics tables and failure cases.
+- [x] Replay held-out failure cases.
 - [ ] Export rollout GIFs.
 
 ## Phase 4: Frontier Extensions

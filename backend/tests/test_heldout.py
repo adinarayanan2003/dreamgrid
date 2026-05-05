@@ -1,7 +1,7 @@
 import csv
 import json
 
-from dreamgrid.heldout import evaluate_heldout, write_heldout_artifacts
+from dreamgrid.heldout import evaluate_heldout, replay_heldout_case, write_heldout_artifacts
 
 
 def test_evaluate_heldout_without_learned_rollouts() -> None:
@@ -40,3 +40,20 @@ def test_write_heldout_artifacts(tmp_path) -> None:
         rows = list(csv.DictReader(csv_file))
     assert rows[0]["kind"] == "planner"
     assert rows[0]["split"] == "validation"
+
+
+def test_replay_heldout_case_returns_step_trace() -> None:
+    replay = replay_heldout_case(
+        split="validation",
+        scenario="moving_hazards",
+        seed=10_000,
+        planner="astar",
+    )
+
+    assert replay["split"] == "validation"
+    assert replay["scenario"] == "moving_hazards"
+    assert replay["seed"] == 10_000
+    assert replay["planner"] == "astar"
+    assert replay["steps"]
+    assert replay["final_event"] in {"goal", "collision", "timeout"}
+    assert replay["steps"][-1]["done"] is True
