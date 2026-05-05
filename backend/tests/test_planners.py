@@ -1,4 +1,7 @@
+import pytest
+
 from dreamgrid.env import GridRescueEnv
+from dreamgrid.model import DEFAULT_MODEL_PATH, TorchUnavailableError, require_torch
 from dreamgrid.planners import AStarPlanner, CEMPlanner, LearnedMPCPlanner, RandomShootingPlanner
 
 
@@ -33,6 +36,13 @@ def test_cem_returns_candidates() -> None:
 
 
 def test_learned_mpc_returns_valid_action() -> None:
+    try:
+        require_torch()
+    except TorchUnavailableError:
+        pytest.skip("train extra is required for learned MPC")
+    if not DEFAULT_MODEL_PATH.exists():
+        pytest.skip("default learned-model checkpoint is not available")
+
     env = GridRescueEnv(grid_size=16)
     env.reset(seed=5)
 

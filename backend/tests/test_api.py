@@ -48,6 +48,41 @@ def test_predict_next_returns_404_for_missing_checkpoint() -> None:
     assert response.status_code == 404
 
 
+def test_predict_next_uses_configured_checkpoint_path(monkeypatch) -> None:
+    monkeypatch.setenv("DREAMGRID_MODEL_PATH", "/tmp/does-not-exist-dreamgrid-env.pt")
+    client = TestClient(app)
+    episode = client.post("/api/episodes/generate", json={"grid_size": 12, "seed": 4}).json()
+
+    response = client.post(
+        "/api/models/predict-next",
+        json={
+            "episode_id": episode["episode_id"],
+            "action": 3,
+        },
+    )
+
+    assert response.status_code == 404
+    assert "DREAMGRID_MODEL_PATH" in response.json()["detail"]
+
+
+def test_learned_planner_returns_404_for_missing_checkpoint(monkeypatch) -> None:
+    monkeypatch.setenv("DREAMGRID_MODEL_PATH", "/tmp/does-not-exist-dreamgrid-env.pt")
+    client = TestClient(app)
+    episode = client.post("/api/episodes/generate", json={"grid_size": 16, "seed": 4}).json()
+
+    response = client.post(
+        "/api/planners/plan",
+        json={
+            "episode_id": episode["episode_id"],
+            "planner": "learned_mpc",
+            "horizon": 2,
+            "num_candidates": 8,
+        },
+    )
+
+    assert response.status_code == 404
+
+
 def test_predict_rollout_rejects_invalid_action() -> None:
     client = TestClient(app)
     episode = client.post("/api/episodes/generate", json={"grid_size": 12, "seed": 4}).json()
