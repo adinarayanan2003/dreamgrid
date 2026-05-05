@@ -30,6 +30,73 @@ DEFAULT_HELDOUT_SCENARIOS = {
 }
 
 
+def replay_heldout_case(
+    split: str,
+    scenario: str,
+    seed: int,
+    planner: str,
+    grid_size: int = 16,
+    horizon: int = 6,
+    num_candidates: int = 48,
+) -> dict:
+    _select("splits", [split], DEFAULT_HELDOUT_SPLITS)
+    _select("scenarios", [scenario], DEFAULT_HELDOUT_SCENARIOS)
+    scenario_config = DEFAULT_HELDOUT_SCENARIOS[scenario]
+    env = GridRescueEnv(
+        grid_size=grid_size,
+        hazard_count=scenario_config.hazard_count,
+        wall_density=scenario_config.wall_density,
+    )
+    env.reset(seed=seed)
+    planner_instance = make_planner(
+        planner,
+        seed=seed,
+        horizon=horizon,
+        num_candidates=num_candidates,
+    )
+    initial_state = env.symbolic_state()
+    steps = []
+    done = False
+    final_event = "timeout"
+    total_reward = 0.0
+
+    while not done:
+        plan = planner_instance.plan(env)
+        result = env.step(plan.selected_action)
+        total_reward += result.reward
+        done = result.done
+        final_event = result.info["event"]
+        steps.append(
+            {
+                "step": env.step_count,
+                "action": plan.selected_action,
+                "action_name": plan.selected_action_name,
+                "planner_score": plan.score,
+                "candidate_count": len(plan.candidates),
+                "reward": result.reward,
+                "total_reward": total_reward,
+                "event": final_event,
+                "done": done,
+                "state": env.symbolic_state(),
+            }
+        )
+
+    return {
+        "split": split,
+        "scenario": scenario,
+        "seed": seed,
+        "planner": planner,
+        "grid_size": grid_size,
+        "config": asdict(scenario_config),
+        "initial_state": initial_state,
+        "steps": steps,
+        "final_event": final_event,
+        "total_reward": total_reward,
+        "step_count": len(steps),
+        "success": final_event == "goal",
+    }
+
+
 def evaluate_heldout(
     planners: list[str],
     episodes_per_split: int = 6,
@@ -270,11 +337,16 @@ def _select(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate DreamGrid on held-out map splits.")
+    parser.add_argument("--replay", action="store_true", help="replay one held-out seed/planner case")
     parser.add_argument(
         "--planners",
         nargs="+",
         default=["random", "astar", "random_shooting", "cem", "learned_mpc"],
     )
+    parser.add_argument("--planner", default="astar", help="planner to use with --replay")
+    parser.add_argument("--split", default="validation", help="held-out split to use with --replay")
+    parser.add_argument("--scenario", default="nominal", help="scenario to use with --replay")
+    parser.add_argument("--seed", type=int, default=10_000, help="exact held-out seed to use with --replay")
     parser.add_argument("--episodes-per-split", type=int, default=6)
     parser.add_argument("--grid-size", type=int, default=16)
     parser.add_argument("--splits", nargs="+", default=list(DEFAULT_HELDOUT_SPLITS))
@@ -288,6 +360,19 @@ def main() -> None:
     parser.add_argument("--out-json", default=None)
     parser.add_argument("--out-csv", default=None)
     args = parser.parse_args()
+
+    if args.replay:
+        replay = replay_heldout_case(
+            split=args.split,
+            scenario=args.scenario,
+            seed=args.seed,
+            planner=args.planner,
+            grid_size=args.grid_size,
+            horizon=args.horizon,
+            num_candidates=args.num_candidates,
+        )
+        print(json.dumps(replay, indent=2, sort_keys=True))
+        return
 
     summary = evaluate_heldout(
         planners=args.planners,
