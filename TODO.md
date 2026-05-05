@@ -10,7 +10,7 @@
 - [x] Export prediction contact sheets to `experiments/world_model_v2_samples/`.
 - [x] Train longer checkpoint: `experiments/world_model_v3_50ep.pt` for 50 CPU epochs; final `frame_mse=0.00393`, `reward_mae=0.01667`, `done_acc=0.986`.
 - [x] Capture dashboard screenshots for desktop and mobile documentation.
-- [x] Add research-style documentation: research report, architecture, contributing guide, and README links.
+- [x] Add project documentation: research report, architecture, contributing guide, and README links.
 
 ## Immediate Engineering Tasks
 
@@ -20,7 +20,7 @@
 - [ ] Add saved experiment metadata for dataset version, model config, metrics, and checkpoint path.
 - [ ] Add one-command project startup script for backend + frontend.
 - [ ] Add frontend error states for backend offline, slow planner calls, and invalid episode sessions.
-- [ ] Add screenshots/GIF exports for portfolio demos.
+- [ ] Add screenshots/GIF exports for release documentation.
 
 ## World Model Tasks
 
@@ -61,5 +61,4 @@
 - [x] Write a technical report explaining model-based RL, learned simulators, and failure modes.
 - [x] Add architecture diagram.
 - [ ] Add cloud GPU training instructions.
-- [x] Add portfolio README section with demo story, metrics, and screenshots.
-- [x] Document what is intentionally non-LLM about the project.
+- [x] Add README sections for objective, metrics, screenshots, and project docs.

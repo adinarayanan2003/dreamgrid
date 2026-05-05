@@ -2,13 +2,13 @@
 
 ## Abstract
 
-DreamGrid is a compact model-based AI lab for studying learned visual dynamics. The system generates episodes in a seeded 2D rescue world, trains a latent CNN world model from transition tuples, and exposes planners plus diagnostics through a dashboard. The current implementation proves the environment, data, training, evaluation, and UI pipeline; the next research step is wiring trained checkpoint inference into learned rollouts and learned MPC.
+DreamGrid is a compact model-based planning system for studying learned visual dynamics. It generates episodes in a seeded 2D rescue world, trains a latent CNN dynamics model from transition tuples, and exposes planners plus diagnostics through a dashboard.
 
 ## Problem Setting
 
 The task is a visual navigation problem. An agent starts near the upper-left of a grid, tries to reach a rescue target near the lower-right, and must avoid moving hazards and walls. Each step produces an RGB observation, a scalar reward, and a terminal flag.
 
-This setup is useful because it is small enough to inspect, but rich enough to expose core world-model problems:
+This setup is small enough to inspect, but rich enough to expose core model-based planning problems:
 
 - learning transition dynamics from pixels
 - predicting terminal events and rewards
@@ -72,11 +72,11 @@ Implemented planners:
 - **Random shooting MPC:** samples action sequences, simulates them, and executes the first action from the best sequence.
 - **CEM planner:** iteratively biases action-sequence sampling toward high-scoring candidates.
 
-Current planners use simulator rollouts. Learned-model rollout scoring is the next major milestone.
+Current planners use simulator rollouts. Learned-model rollout scoring is a planned extension.
 
 ## Results
 
-The best completed local training run used `dataset_1000.npz` and trained for 50 CPU epochs.
+The best recorded training run used `dataset_1000.npz` and trained for 50 CPU epochs.
 
 | Metric | Value |
 | --- | ---: |
@@ -104,7 +104,7 @@ current frame | target next frame | predicted next frame | error heatmap
 
 These artifacts are ignored by git because they are generated experiment outputs.
 
-The dashboard screenshots below show the current interactive lab interface.
+The dashboard screenshots below show the interactive planning interface.
 
 ![DreamGrid desktop dashboard](assets/dreamgrid-dashboard-desktop.png)
 
@@ -115,15 +115,14 @@ The dashboard screenshots below show the current interactive lab interface.
 - The trained checkpoint is not yet used by the API for learned rollouts.
 - Multi-step rollout drift is not measured yet.
 - The training script currently saves the final checkpoint, not the best-validation checkpoint.
-- Local PyTorch reports `mps False`, so the 50-epoch run was CPU-only.
+- PyTorch reported `mps False` on the training machine, so the 50-epoch run was CPU-only.
 - The current model is a one-step latent CNN dynamics model, not a recurrent state-space model.
 - The planner can still exploit simulator truth; learned-model planning remains pending.
 
-## Next Research Milestones
+## Next Milestones
 
 1. Save the best-validation checkpoint during training.
 2. Add API checkpoint loading for `predict-next`.
 3. Add dashboard real-vs-predicted inspection.
 4. Add multi-step rollout metrics at horizons 1, 3, 5, and 10.
 5. Implement learned-model MPC and compare it against simulator MPC, A*, and random baselines.
-

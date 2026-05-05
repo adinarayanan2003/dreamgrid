@@ -1,8 +1,8 @@
 # DreamGrid
 
-DreamGrid is a non-LLM world-model research project: a visual 2D rescue environment where an agent learns how the world changes, then uses planners to reason over possible futures.
+DreamGrid is a visual model-based planning project. It provides a 2D rescue environment, planner baselines, transition dataset generation, latent dynamics training, and a dashboard for inspecting episodes and planner behavior.
 
-The project is intentionally framed around model-based AI rather than LLMs. It combines a controlled visual environment, classical planners, transition datasets, a latent CNN world model, training metrics, and an interactive dashboard for inspecting behavior.
+The codebase is structured as a reproducible research/engineering system: simulator, planners, dataset pipeline, model training, API, UI, tests, and documentation.
 
 ![DreamGrid desktop dashboard](docs/assets/dreamgrid-dashboard-desktop.png)
 
@@ -12,11 +12,11 @@ The repository contains:
 - `frontend/`: React dashboard for live episodes, imagined rollouts, and planner comparisons.
 - `docs/`: research report, architecture notes, roadmap, and screenshots.
 
-## Research Question
+## Objective
 
-Can a compact visual world model learn enough transition dynamics from a grid-rescue simulator to support imagined rollouts and, eventually, model-based planning?
+Evaluate whether a compact visual dynamics model can learn useful transition predictions from a grid-rescue simulator and support rollout-based planning workflows.
 
-DreamGrid studies this through a deliberately small but inspectable setup:
+The project is built around a deliberately small but inspectable setup:
 
 - **Environment:** a seeded 2D rescue grid with walls, moving hazards, a goal, and sparse terminal rewards.
 - **Dataset:** transition tuples of `(observation, action, next observation, reward, done)`.
@@ -24,7 +24,7 @@ DreamGrid studies this through a deliberately small but inspectable setup:
 - **Baselines:** random policy, A*, random-shooting MPC, and CEM-style planning.
 - **Interface:** a dashboard for live state, planner controls, candidate rollouts, and evaluation metrics.
 
-## Current Status
+## Implementation Status
 
 Implemented:
 
@@ -36,14 +36,14 @@ Implemented:
 - PyTorch latent world-model architecture and training script.
 - Validation metrics and prediction contact-sheet export.
 
-Current limitation:
+Limitations:
 
 - The dashboard/planners still use the true simulator for rollouts.
 - The trained checkpoint is not yet wired into API-driven learned rollouts or learned MPC.
 
 ## Results Snapshot
 
-Local training artifacts are intentionally ignored by git, but the latest run produced:
+Generated training artifacts are ignored by git. The latest recorded run produced:
 
 | Artifact | Value |
 | --- | --- |
@@ -133,7 +133,7 @@ cd frontend
 npm run build
 ```
 
-## Documentation
+## Project Docs
 
 - [Research report](docs/RESEARCH.md)
 - [Architecture](docs/ARCHITECTURE.md)
@@ -141,4 +141,4 @@ npm run build
 - [Contributing](CONTRIBUTING.md)
 - [TODO](TODO.md)
 
-Experiment datasets, checkpoints, and sample images are intentionally ignored by git. Regenerate them with the commands above, or publish them separately as release artifacts if needed.
+Experiment datasets, checkpoints, and sample images are ignored by git. Regenerate them with the commands above, or publish them separately as release artifacts if needed.
