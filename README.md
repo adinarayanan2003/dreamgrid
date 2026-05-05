@@ -4,6 +4,8 @@ DreamGrid is a visual model-based planning project. It provides a 2D rescue envi
 
 The codebase is structured as a reproducible research/engineering system: simulator, planners, dataset pipeline, model training, API, UI, tests, and documentation.
 
+![DreamGrid dashboard](docs/assets/dreamgrid-dashboard-desktop.png)
+
 The repository contains:
 
 - `backend/`: GridRescue environment, planners, dataset generation, model code, FastAPI service, and tests.
