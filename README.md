@@ -58,6 +58,12 @@ Generated training artifacts are ignored by git. The latest recorded run produce
 
 See [docs/RESEARCH.md](docs/RESEARCH.md) for methodology, results, and limitations.
 
+## Model Inspection
+
+The dashboard includes a multi-step drift view for comparing simulator frames, model predictions, and per-step error across imagined action sequences.
+
+![DreamGrid multi-step drift](docs/assets/dreamgrid-multistep-drift.png)
+
 ## Quick Start
 
 Backend:
