@@ -135,7 +135,11 @@ Evaluate held-out splits and stress scenarios:
 
 ```bash
 cd backend
-python -m dreamgrid.evaluate --heldout --episodes-per-split 6 --scenarios nominal moving_hazards
+python -m dreamgrid.evaluate --heldout \
+  --episodes-per-split 6 \
+  --scenarios nominal moving_hazards \
+  --out-json ../experiments/heldout.json \
+  --out-csv ../experiments/heldout.csv
 ```
 
 Run API/backend tests:
