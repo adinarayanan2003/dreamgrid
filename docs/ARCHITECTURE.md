@@ -80,7 +80,17 @@ FastAPI endpoints:
 | `POST /api/episodes/{episode_id}/step` | apply an action or planner step |
 | `POST /api/planners/plan` | score planner candidates |
 | `POST /api/models/rollout` | rollout actions through the simulator clone |
+| `POST /api/models/predict-next` | compare one learned next-frame prediction with simulator truth |
+| `POST /api/models/predict-rollout` | compare multi-step learned rollout drift with simulator truth |
 | `POST /api/eval/run` | compare planners across episodes |
+
+Learned-model endpoints and `learned_mpc` resolve checkpoints in this order:
+
+1. request-level `model_path`, where supported
+2. `DREAMGRID_MODEL_PATH`
+3. `experiments/world_model_v3_50ep.pt`
+
+Missing checkpoints return an unavailable response instead of falling back to simulator rollouts.
 
 ### Dashboard
 
@@ -120,7 +130,6 @@ dataset CLI generates transitions
 ## Design Constraints
 
 - Keep the environment small enough for CPU smoke tests.
-- Keep generated datasets/checkpoints outside git.
+- Keep generated datasets outside git and publish reusable checkpoints through Git LFS or release artifacts.
 - Preserve a clear boundary between simulator planning and learned-model planning.
 - Use visual diagnostics because world-model quality cannot be judged by scalar loss alone.
-

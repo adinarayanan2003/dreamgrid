@@ -18,7 +18,7 @@ DreamGrid currently has a complete simulator/planner/dashboard MVP plus a traine
 - [x] Track one-step prediction metrics.
 - [ ] Save best-validation checkpoint during training.
 - [ ] Track multi-step prediction error.
-- [ ] Add model checkpoints to the API planner path.
+- [x] Add model checkpoints to the API planner path.
 
 ## Phase 3: Evaluation
 

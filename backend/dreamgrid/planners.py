@@ -8,10 +8,8 @@ from typing import Protocol
 import numpy as np
 
 from dreamgrid.env import GridRescueEnv
-from dreamgrid.model import TorchUnavailableError, load_model, require_torch
+from dreamgrid.model import load_model, require_model_path, require_torch
 from dreamgrid.types import ACTION_NAMES, ACTION_TO_DELTA, Position
-
-DEFAULT_MODEL_PATH = Path(__file__).resolve().parents[2] / "experiments" / "world_model_v3_50ep.pt"
 
 
 @dataclass
@@ -148,7 +146,7 @@ class LearnedMPCPlanner:
         self.horizon = min(horizon, 6)
         self.num_candidates = num_candidates
         self.rng = np.random.default_rng(seed)
-        self.model_path = model_path or DEFAULT_MODEL_PATH
+        self.model_path = require_model_path(model_path)
         self.torch = require_torch()
         self.model = load_model(self.model_path)
 
@@ -198,10 +196,7 @@ def make_planner(name: str, seed: int = 0, horizon: int = 12, num_candidates: in
     if name == "cem":
         return CEMPlanner(horizon=horizon, num_candidates=num_candidates, seed=seed)
     if name == "learned_mpc":
-        try:
-            return LearnedMPCPlanner(horizon=horizon, num_candidates=num_candidates, seed=seed)
-        except TorchUnavailableError as exc:
-            raise RuntimeError(str(exc)) from exc
+        return LearnedMPCPlanner(horizon=horizon, num_candidates=num_candidates, seed=seed)
     raise ValueError(f"Unknown planner: {name}")
 
 
