@@ -15,7 +15,13 @@ from pydantic import BaseModel, Field
 
 from dreamgrid.env import GridRescueEnv
 from dreamgrid.evaluate import evaluate
-from dreamgrid.model import TorchUnavailableError, load_model, require_torch
+from dreamgrid.model import (
+    ModelCheckpointUnavailableError,
+    TorchUnavailableError,
+    load_model,
+    require_model_path,
+    require_torch,
+)
 from dreamgrid.planners import PlanCandidate, make_planner
 from dreamgrid.types import ACTION_NAMES
 
@@ -78,7 +84,6 @@ app.add_middleware(
 )
 
 SESSIONS: dict[str, GridRescueEnv] = {}
-DEFAULT_MODEL_PATH = Path(__file__).resolve().parents[2] / "experiments" / "world_model_v3_50ep.pt"
 
 
 @app.get("/api/health")
@@ -111,7 +116,7 @@ def step_episode(episode_id: str, request: StepRequest) -> dict:
     env = _session(episode_id)
     if request.action is None:
         planner_name = request.planner or "cem"
-        plan = make_planner(planner_name, seed=env.seed + env.step_count).plan(env)
+        plan = _make_planner(planner_name, seed=env.seed + env.step_count).plan(env)
         action = plan.selected_action
     else:
         action = request.action
@@ -129,7 +134,7 @@ def step_episode(episode_id: str, request: StepRequest) -> dict:
 @app.post("/api/planners/plan")
 def plan(request: PlanRequest) -> dict:
     env = _session(request.episode_id)
-    planner = make_planner(
+    planner = _make_planner(
         request.planner,
         seed=env.seed + env.step_count,
         horizon=request.horizon,
@@ -172,9 +177,7 @@ def rollout(request: RolloutRequest) -> dict:
 @app.post("/api/models/predict-next")
 def predict_next(request: PredictNextRequest) -> dict:
     env = _session(request.episode_id)
-    model_path = Path(request.model_path) if request.model_path else DEFAULT_MODEL_PATH
-    if not model_path.exists():
-        raise HTTPException(status_code=404, detail=f"model checkpoint not found: {model_path}")
+    model_path = _model_path_or_404(request.model_path)
 
     current_obs = env.render()
     actual_env = env.clone()
@@ -216,9 +219,7 @@ def predict_next(request: PredictNextRequest) -> dict:
 @app.post("/api/models/predict-rollout")
 def predict_rollout(request: PredictRolloutRequest) -> dict:
     env = _session(request.episode_id)
-    model_path = Path(request.model_path) if request.model_path else DEFAULT_MODEL_PATH
-    if not model_path.exists():
-        raise HTTPException(status_code=404, detail=f"model checkpoint not found: {model_path}")
+    model_path = _model_path_or_404(request.model_path)
     invalid_actions = [action for action in request.actions if action not in ACTION_NAMES]
     if invalid_actions:
         raise HTTPException(status_code=400, detail=f"invalid actions: {invalid_actions}")
@@ -280,8 +281,8 @@ def predict_rollout(request: PredictRolloutRequest) -> dict:
 
 @app.post("/api/eval/run")
 def run_eval(request: EvalRequest) -> dict:
-    return {
-        "metrics": evaluate(
+    try:
+        metrics = evaluate(
             planners=list(request.planners),
             episodes=request.episodes,
             grid_size=request.grid_size,
@@ -289,7 +290,11 @@ def run_eval(request: EvalRequest) -> dict:
             horizon=request.horizon,
             num_candidates=request.num_candidates,
         )
-    }
+    except TorchUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ModelCheckpointUnavailableError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"metrics": metrics}
 
 
 def _session(episode_id: str) -> GridRescueEnv:
@@ -297,6 +302,22 @@ def _session(episode_id: str) -> GridRescueEnv:
     if env is None:
         raise HTTPException(status_code=404, detail=f"episode not found: {episode_id}")
     return env
+
+
+def _make_planner(name: str, **kwargs):
+    try:
+        return make_planner(name, **kwargs)
+    except TorchUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ModelCheckpointUnavailableError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+def _model_path_or_404(path: str | None = None) -> Path:
+    try:
+        return require_model_path(path)
+    except ModelCheckpointUnavailableError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 def _episode_payload(

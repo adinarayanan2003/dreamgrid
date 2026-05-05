@@ -112,17 +112,15 @@ The dashboard screenshots below show the interactive planning interface.
 
 ## Limitations
 
-- The trained checkpoint is not yet used by the API for learned rollouts.
-- Multi-step rollout drift is not measured yet.
+- Learned rollout inspection is API-backed, but aggregate oracle-vs-learned metrics are still pending.
 - The training script currently saves the final checkpoint, not the best-validation checkpoint.
 - PyTorch reported `mps False` on the training machine, so the 50-epoch run was CPU-only.
 - The current model is a one-step latent CNN dynamics model, not a recurrent state-space model.
-- The planner can still exploit simulator truth; learned-model planning remains pending.
+- Classical planners still exploit simulator truth; learned MPC is available as an explicit separate planner.
 
 ## Next Milestones
 
 1. Save the best-validation checkpoint during training.
-2. Add API checkpoint loading for `predict-next`.
-3. Add dashboard real-vs-predicted inspection.
-4. Add multi-step rollout metrics at horizons 1, 3, 5, and 10.
-5. Implement learned-model MPC and compare it against simulator MPC, A*, and random baselines.
+2. Add multi-step rollout metrics at horizons 1, 3, 5, and 10.
+3. Compare learned-model MPC against simulator MPC, A*, and random baselines.
+4. Export rollout GIFs, metrics tables, and failure cases.
