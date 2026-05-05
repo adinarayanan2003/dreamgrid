@@ -1,4 +1,4 @@
-import { Activity, Gauge, GitBranch, Play, RefreshCcw, StepForward } from 'lucide-react';
+import { Activity, BrainCircuit, Gauge, GitBranch, Play, RefreshCcw, StepForward } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
   CellPos,
@@ -6,8 +6,12 @@ import {
   EvalMetrics,
   PlanCandidate,
   PlannerName,
+  PredictionPayload,
+  RolloutPredictionPayload,
   createEpisode,
   planEpisode,
+  predictNext,
+  predictRollout,
   runEval,
   stepEpisode
 } from './api';
@@ -16,7 +20,8 @@ const plannerLabels: Record<PlannerName, string> = {
   random: 'Random',
   astar: 'A*',
   random_shooting: 'Shooting',
-  cem: 'CEM'
+  cem: 'CEM',
+  learned_mpc: 'Learned MPC'
 };
 
 export function App() {
@@ -24,6 +29,8 @@ export function App() {
   const [planner, setPlanner] = useState<PlannerName>('cem');
   const [plan, setPlan] = useState<PlanCandidate[]>([]);
   const [metrics, setMetrics] = useState<EvalMetrics>({});
+  const [prediction, setPrediction] = useState<PredictionPayload | null>(null);
+  const [rolloutPrediction, setRolloutPrediction] = useState<RolloutPredictionPayload | null>(null);
   const [seed, setSeed] = useState(7);
   const [horizon, setHorizon] = useState(12);
   const [numCandidates, setNumCandidates] = useState(256);
@@ -43,6 +50,8 @@ export function App() {
       const payload = await createEpisode(nextSeed);
       setEpisode(payload);
       setPlan([]);
+      setPrediction(null);
+      setRolloutPrediction(null);
       setStatus('Ready');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Request failed');
@@ -58,6 +67,8 @@ export function App() {
     try {
       const payload = await planEpisode(episode.episode_id, planner, horizon, numCandidates);
       setPlan(payload.candidates);
+      setPrediction(null);
+      setRolloutPrediction(null);
       setStatus(`${payload.selected_action_name} selected`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Planning failed');
@@ -75,6 +86,8 @@ export function App() {
       setEpisode(payload);
       const planPayload = await planEpisode(payload.episode_id, planner, horizon, numCandidates);
       setPlan(planPayload.candidates);
+      setPrediction(null);
+      setRolloutPrediction(null);
       setStatus(payload.event);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Step failed');
@@ -89,6 +102,38 @@ export function App() {
       setMetrics(payload.metrics);
     } catch {
       setMetrics({});
+    }
+  }
+
+  async function inspectModel() {
+    if (!episode) return;
+    setBusy(true);
+    setStatus('Predicting');
+    try {
+      const action = plan[0]?.actions[0] ?? 3;
+      const payload = await predictNext(episode.episode_id, action);
+      setPrediction(payload);
+      setStatus(`model predicted ${payload.action_name}`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Prediction failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function inspectRollout() {
+    if (!episode) return;
+    setBusy(true);
+    setStatus('Rolling out');
+    try {
+      const actions = plan[0]?.actions.slice(0, 10) ?? [3, 3, 1, 1, 3, 1, 3, 1];
+      const payload = await predictRollout(episode.episode_id, actions);
+      setRolloutPrediction(payload);
+      setStatus(`rollout mse ${payload.avg_frame_mse.toFixed(4)}`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Rollout failed');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -175,6 +220,16 @@ export function App() {
             </button>
           </div>
 
+          <button type="button" onClick={inspectModel} disabled={busy || !episode} title="Inspect model prediction">
+            <BrainCircuit size={16} />
+            Inspect Model
+          </button>
+
+          <button type="button" onClick={inspectRollout} disabled={busy || !episode} title="Inspect multi-step rollout">
+            <GitBranch size={16} />
+            Inspect Rollout
+          </button>
+
           <button className="primary" type="button" onClick={step} disabled={busy || !episode || episode.done}>
             <Play size={16} />
             Execute Planner Step
@@ -205,6 +260,26 @@ export function App() {
               ))}
               {plan.length === 0 && <div className="empty">Run planner</div>}
             </div>
+          </div>
+
+          <div className="panel prediction-panel">
+            <div className="panel-title">
+              <h2>Real vs Predicted</h2>
+              {prediction && <span>{prediction.model_id}</span>}
+            </div>
+            {prediction ? <PredictionView prediction={prediction} /> : <div className="empty">Inspect model</div>}
+          </div>
+
+          <div className="panel rollout-panel">
+            <div className="panel-title">
+              <h2>Multi-Step Drift</h2>
+              {rolloutPrediction && <span>avg MSE {rolloutPrediction.avg_frame_mse.toFixed(4)}</span>}
+            </div>
+            {rolloutPrediction ? (
+              <RolloutView rollout={rolloutPrediction} />
+            ) : (
+              <div className="empty">Inspect rollout</div>
+            )}
           </div>
         </section>
 
@@ -272,7 +347,62 @@ function CandidateRow({ candidate, index }: { candidate: PlanCandidate; index: n
   );
 }
 
+function PredictionView({ prediction }: { prediction: PredictionPayload }) {
+  const frames = [
+    ['Current', prediction.current_image],
+    ['Actual Next', prediction.actual_next_image],
+    ['Predicted', prediction.predicted_next_image],
+    ['Error', prediction.error_image]
+  ] as const;
+
+  return (
+    <div className="prediction-view">
+      <div className="prediction-frames">
+        {frames.map(([label, image]) => (
+          <figure key={label}>
+            <img src={image} alt={label} />
+            <figcaption>{label}</figcaption>
+          </figure>
+        ))}
+      </div>
+      <div className="prediction-stats">
+        <span>action: {prediction.action_name}</span>
+        <span>actual: {prediction.actual_event}</span>
+        <span>reward: {prediction.predicted_reward.toFixed(3)} / {prediction.actual_reward.toFixed(3)}</span>
+        <span>done: {(prediction.predicted_done_probability * 100).toFixed(1)}%</span>
+      </div>
+    </div>
+  );
+}
+
+function RolloutView({ rollout }: { rollout: RolloutPredictionPayload }) {
+  return (
+    <div className="rollout-view">
+      <div className="rollout-actions">{rollout.action_names.slice(0, 12).join(' -> ')}</div>
+      <div className="rollout-strip">
+        {rollout.frames.map((frame) => (
+          <div className="rollout-step" key={frame.step}>
+            <div className="rollout-step-head">
+              <strong>step {frame.step}</strong>
+              <span>{frame.frame_mse.toFixed(4)}</span>
+            </div>
+            <div className="rollout-images">
+              <img src={frame.actual_image} alt={`Actual step ${frame.step}`} />
+              <img src={frame.predicted_image} alt={`Predicted step ${frame.step}`} />
+              <img src={frame.error_image} alt={`Error step ${frame.step}`} />
+            </div>
+            <div className="rollout-meta">
+              <span>{frame.action_name}</span>
+              <span>{frame.actual_event}</span>
+              <span>{frame.predicted_reward.toFixed(2)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function key(pos: CellPos) {
   return `${pos.row}:${pos.col}`;
 }
-

@@ -1,4 +1,4 @@
-export type PlannerName = 'random' | 'astar' | 'random_shooting' | 'cem';
+export type PlannerName = 'random' | 'astar' | 'random_shooting' | 'cem' | 'learned_mpc';
 
 export type CellPos = {
   row: number;
@@ -57,6 +57,45 @@ export type EvalMetrics = Record<
   }
 >;
 
+export type PredictionPayload = {
+  model_id: string;
+  action: number;
+  action_name: string;
+  current_image: string;
+  actual_next_image: string;
+  predicted_next_image: string;
+  error_image: string;
+  actual_reward: number;
+  actual_done: boolean;
+  actual_event: string;
+  predicted_reward: number;
+  predicted_done_probability: number;
+  predicted_done: boolean;
+};
+
+export type RolloutPredictionFrame = {
+  step: number;
+  action: number;
+  action_name: string;
+  actual_image: string;
+  predicted_image: string;
+  error_image: string;
+  frame_mse: number;
+  actual_reward: number;
+  actual_done: boolean;
+  actual_event: string;
+  predicted_reward: number;
+  predicted_done_probability: number;
+};
+
+export type RolloutPredictionPayload = {
+  model_id: string;
+  actions: number[];
+  action_names: string[];
+  frames: RolloutPredictionFrame[];
+  avg_frame_mse: number;
+};
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -106,12 +145,32 @@ export function runEval() {
   return request<{ metrics: EvalMetrics }>('/api/eval/run', {
     method: 'POST',
     body: JSON.stringify({
-      planners: ['random', 'astar', 'random_shooting', 'cem'],
+      planners: ['random', 'astar', 'random_shooting', 'cem', 'learned_mpc'],
       episodes: 6,
       grid_size: 16,
       seed: 120,
       horizon: 6,
       num_candidates: 48
+    })
+  });
+}
+
+export function predictNext(episodeId: string, action: number) {
+  return request<PredictionPayload>('/api/models/predict-next', {
+    method: 'POST',
+    body: JSON.stringify({
+      episode_id: episodeId,
+      action
+    })
+  });
+}
+
+export function predictRollout(episodeId: string, actions: number[]) {
+  return request<RolloutPredictionPayload>('/api/models/predict-rollout', {
+    method: 'POST',
+    body: JSON.stringify({
+      episode_id: episodeId,
+      actions
     })
   });
 }
