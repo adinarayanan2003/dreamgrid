@@ -138,6 +138,7 @@ def test_heldout_eval_runs_without_learned_rollouts() -> None:
     assert response.status_code == 200
     scenario = response.json()["metrics"]["splits"]["validation"]["scenarios"]["moving_hazards"]
     assert scenario["config"]["hazard_count"] == 6
+    assert "astar" in scenario["failure_cases"]
     assert scenario["learned_rollouts"] is None
 
 

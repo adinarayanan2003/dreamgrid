@@ -113,7 +113,7 @@ The dashboard screenshots below show the interactive planning interface.
 ## Limitations
 
 - Learned rollout inspection and aggregate oracle-vs-learned metrics are API-backed.
-- Held-out validation/test seed splits are API-backed, but exported tables and failure-case artifacts are pending.
+- Held-out validation/test seed splits are API-backed, and the CLI can export JSON/CSV tables plus capped planner failure-case traces.
 - The training script currently saves the final checkpoint, not the best-validation checkpoint.
 - PyTorch reported `mps False` on the training machine, so the 50-epoch run was CPU-only.
 - The current model is a one-step latent CNN dynamics model, not a recurrent state-space model.
@@ -123,4 +123,4 @@ The dashboard screenshots below show the interactive planning interface.
 
 1. Save the best-validation checkpoint during training.
 2. Compare learned-model MPC against simulator MPC, A*, and random baselines.
-3. Export rollout GIFs, metrics tables, and failure cases.
+3. Export rollout GIFs for selected failure cases.

@@ -109,6 +109,7 @@ class HeldoutEvalRequest(BaseModel):
     )
     include_learned_rollouts: bool = True
     model_path: str | None = None
+    max_failure_cases: int = Field(default=8, ge=0, le=50)
 
 
 app = FastAPI(title="DreamGrid API", version="0.1.0")
@@ -367,6 +368,7 @@ def run_heldout_eval(request: HeldoutEvalRequest) -> dict:
             rollout_horizons=request.rollout_horizons,
             include_learned_rollouts=request.include_learned_rollouts,
             model_path=request.model_path,
+            max_failure_cases=request.max_failure_cases,
         )
     except TorchUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
