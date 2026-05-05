@@ -83,6 +83,7 @@ FastAPI endpoints:
 | `POST /api/models/predict-next` | compare one learned next-frame prediction with simulator truth |
 | `POST /api/models/predict-rollout` | compare multi-step learned rollout drift with simulator truth |
 | `POST /api/eval/run` | compare planners across episodes |
+| `POST /api/eval/learned-rollouts` | aggregate oracle-vs-learned rollout metrics by horizon |
 
 Learned-model endpoints and `learned_mpc` resolve checkpoints in this order:
 
@@ -99,7 +100,8 @@ The dashboard contains:
 - planner controls
 - live grid visualization
 - candidate rollout list
-- evaluation metrics
+- planner evaluation metrics
+- learned rollout drift metrics
 - responsive desktop/mobile layout
 
 Current dashboard screenshots are stored under `docs/assets/`.

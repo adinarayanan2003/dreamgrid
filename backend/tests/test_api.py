@@ -96,3 +96,26 @@ def test_predict_rollout_rejects_invalid_action() -> None:
     )
 
     assert response.status_code == 400
+
+
+def test_learned_rollout_eval_returns_404_for_missing_checkpoint(monkeypatch) -> None:
+    monkeypatch.setenv("DREAMGRID_MODEL_PATH", "/tmp/does-not-exist-dreamgrid-env.pt")
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/eval/learned-rollouts",
+        json={"episodes": 1, "horizons": [1, 3], "grid_size": 16},
+    )
+
+    assert response.status_code == 404
+
+
+def test_learned_rollout_eval_rejects_invalid_horizon() -> None:
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/eval/learned-rollouts",
+        json={"episodes": 1, "horizons": [0], "grid_size": 16},
+    )
+
+    assert response.status_code == 400

@@ -96,6 +96,23 @@ export type RolloutPredictionPayload = {
   avg_frame_mse: number;
 };
 
+export type RolloutEvalMetrics = {
+  model_id: string;
+  episodes: number;
+  grid_size: number;
+  seed: number;
+  action_policy: string;
+  horizons: Record<
+    string,
+    {
+      frame_mse: number;
+      reward_mae: number;
+      done_accuracy: number;
+      samples: number;
+    }
+  >;
+};
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -151,6 +168,18 @@ export function runEval() {
       seed: 120,
       horizon: 6,
       num_candidates: 48
+    })
+  });
+}
+
+export function runRolloutEval() {
+  return request<{ metrics: RolloutEvalMetrics }>('/api/eval/learned-rollouts', {
+    method: 'POST',
+    body: JSON.stringify({
+      episodes: 8,
+      grid_size: 16,
+      seed: 220,
+      horizons: [1, 3, 5, 10]
     })
   });
 }

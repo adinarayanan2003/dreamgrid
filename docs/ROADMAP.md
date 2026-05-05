@@ -2,7 +2,7 @@
 
 ## Current State
 
-DreamGrid currently has a complete simulator/planner/dashboard MVP plus a trained latent world-model checkpoint. The next milestone is to move from simulator rollouts to learned-model rollouts in the API and dashboard.
+DreamGrid currently has a complete simulator/planner/dashboard MVP plus a trained latent world-model checkpoint. Learned rollout inspection and aggregate oracle-vs-learned metrics are available through the API and dashboard.
 
 ## Phase 1: Working Lab
 
@@ -17,13 +17,13 @@ DreamGrid currently has a complete simulator/planner/dashboard MVP plus a traine
 - [x] Train a latent CNN dynamics model on image observations.
 - [x] Track one-step prediction metrics.
 - [ ] Save best-validation checkpoint during training.
-- [ ] Track multi-step prediction error.
+- [x] Track multi-step prediction error.
 - [x] Add model checkpoints to the API planner path.
 
 ## Phase 3: Evaluation
 
 - [x] Compare random, A*, random-shooting, and CEM planners.
-- [ ] Add oracle-vs-learned-model rollout comparison.
+- [x] Add oracle-vs-learned-model rollout comparison.
 - [ ] Evaluate on held-out map splits and moving hazard scenarios.
 - [ ] Export rollout GIFs, metrics tables, and failure cases.
 

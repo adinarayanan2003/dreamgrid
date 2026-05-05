@@ -112,7 +112,7 @@ The dashboard screenshots below show the interactive planning interface.
 
 ## Limitations
 
-- Learned rollout inspection is API-backed, but aggregate oracle-vs-learned metrics are still pending.
+- Learned rollout inspection and aggregate oracle-vs-learned metrics are API-backed.
 - The training script currently saves the final checkpoint, not the best-validation checkpoint.
 - PyTorch reported `mps False` on the training machine, so the 50-epoch run was CPU-only.
 - The current model is a one-step latent CNN dynamics model, not a recurrent state-space model.
@@ -121,6 +121,6 @@ The dashboard screenshots below show the interactive planning interface.
 ## Next Milestones
 
 1. Save the best-validation checkpoint during training.
-2. Add multi-step rollout metrics at horizons 1, 3, 5, and 10.
-3. Compare learned-model MPC against simulator MPC, A*, and random baselines.
+2. Compare learned-model MPC against simulator MPC, A*, and random baselines.
+3. Evaluate on held-out map splits and moving hazard scenarios.
 4. Export rollout GIFs, metrics tables, and failure cases.
