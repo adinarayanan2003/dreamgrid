@@ -60,14 +60,25 @@ def evaluate(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate DreamGrid planners.")
-    parser.add_argument("--planners", nargs="+", default=["random", "astar", "random_shooting", "cem"])
+    parser.add_argument(
+        "--planners",
+        nargs="+",
+        default=["random", "astar", "random_shooting", "cem", "learned_mpc"],
+    )
     parser.add_argument("--episodes", type=int, default=50)
     parser.add_argument("--grid-size", type=int, default=16)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--horizon", type=int, default=6)
     parser.add_argument("--num-candidates", type=int, default=48)
     args = parser.parse_args()
-    summary = evaluate(args.planners, args.episodes, args.grid_size, args.seed, horizon=args.horizon, num_candidates=args.num_candidates)
+    summary = evaluate(
+        args.planners,
+        args.episodes,
+        args.grid_size,
+        args.seed,
+        horizon=args.horizon,
+        num_candidates=args.num_candidates,
+    )
     for planner, metrics in summary.items():
         print(planner, metrics)
 

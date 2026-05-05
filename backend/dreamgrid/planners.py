@@ -2,12 +2,16 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 
 import numpy as np
 
 from dreamgrid.env import GridRescueEnv
+from dreamgrid.model import TorchUnavailableError, load_model, require_torch
 from dreamgrid.types import ACTION_NAMES, ACTION_TO_DELTA, Position
+
+DEFAULT_MODEL_PATH = Path(__file__).resolve().parents[2] / "experiments" / "world_model_v3_50ep.pt"
 
 
 @dataclass
@@ -133,6 +137,57 @@ class CEMPlanner:
         return PlanResult(action, ACTION_NAMES[action], best.score, scored[:8])
 
 
+class LearnedMPCPlanner:
+    def __init__(
+        self,
+        horizon: int = 4,
+        num_candidates: int = 128,
+        seed: int = 0,
+        model_path: Path | None = None,
+    ) -> None:
+        self.horizon = min(horizon, 6)
+        self.num_candidates = num_candidates
+        self.rng = np.random.default_rng(seed)
+        self.model_path = model_path or DEFAULT_MODEL_PATH
+        self.torch = require_torch()
+        self.model = load_model(self.model_path)
+
+    def plan(self, env: GridRescueEnv) -> PlanResult:
+        current_obs = env.render()
+        expected_size = self.model.config.image_size
+        if current_obs.shape[:2] != (expected_size, expected_size):
+            raise ValueError(
+                f"LearnedMPCPlanner expects {expected_size}x{expected_size} observations; "
+                f"got {current_obs.shape[0]}x{current_obs.shape[1]}"
+            )
+        sequences = self.rng.integers(0, len(ACTION_NAMES), size=(self.num_candidates, self.horizon))
+        candidates = [self._score_sequence(current_obs, seq.tolist()) for seq in sequences]
+        candidates.sort(key=lambda candidate: candidate.score, reverse=True)
+        best = candidates[0]
+        action = best.actions[0] if best.actions else 4
+        return PlanResult(action, ACTION_NAMES[action], best.score, candidates[:8])
+
+    def _score_sequence(self, current_obs: np.ndarray, actions: list[int]) -> PlanCandidate:
+        obs_tensor = self._obs_tensor(current_obs)
+        total = 0.0
+        done_probability = 0.0
+        with self.torch.no_grad():
+            for idx, action in enumerate(actions):
+                action_tensor = self.torch.tensor([action]).long()
+                pred = self.model(obs_tensor, action_tensor)
+                reward = float(pred["reward"][0].detach().cpu())
+                done_probability = float(self.torch.sigmoid(pred["done_logit"][0]).detach().cpu())
+                total += (reward - 0.35 * done_probability) * (0.96**idx)
+                obs_tensor = pred["next_obs"].detach()
+                if done_probability >= 0.75:
+                    break
+        event = "learned_done" if done_probability >= 0.5 else "learned_horizon"
+        return PlanCandidate(actions=actions, score=float(total), path=[], event=event)
+
+    def _obs_tensor(self, image: np.ndarray):
+        return self.torch.tensor(image).float().permute(2, 0, 1).unsqueeze(0) / 255.0
+
+
 def make_planner(name: str, seed: int = 0, horizon: int = 12, num_candidates: int = 256) -> Planner:
     if name == "random":
         return RandomPlanner(seed=seed)
@@ -142,6 +197,11 @@ def make_planner(name: str, seed: int = 0, horizon: int = 12, num_candidates: in
         return RandomShootingPlanner(horizon=horizon, num_candidates=num_candidates, seed=seed)
     if name == "cem":
         return CEMPlanner(horizon=horizon, num_candidates=num_candidates, seed=seed)
+    if name == "learned_mpc":
+        try:
+            return LearnedMPCPlanner(horizon=horizon, num_candidates=num_candidates, seed=seed)
+        except TorchUnavailableError as exc:
+            raise RuntimeError(str(exc)) from exc
     raise ValueError(f"Unknown planner: {name}")
 
 
@@ -187,4 +247,3 @@ def _action_between(a: Position, b: Position) -> int:
 
 def _pos(pos: Position) -> dict[str, int]:
     return {"row": int(pos.row), "col": int(pos.col)}
-

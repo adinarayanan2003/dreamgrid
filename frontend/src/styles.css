@@ -175,7 +175,7 @@ button:disabled {
 .lab {
   display: grid;
   gap: 16px;
-  grid-template-rows: auto minmax(180px, 1fr);
+  grid-template-rows: auto minmax(180px, auto) minmax(180px, auto) minmax(180px, auto);
   min-width: 0;
 }
 
@@ -268,6 +268,130 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.prediction-panel {
+  min-height: 230px;
+}
+
+.rollout-panel {
+  min-height: 230px;
+}
+
+.prediction-view {
+  display: grid;
+  gap: 12px;
+}
+
+.prediction-frames {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.prediction-frames figure {
+  margin: 0;
+  min-width: 0;
+}
+
+.prediction-frames img {
+  aspect-ratio: 1;
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  display: block;
+  image-rendering: pixelated;
+  width: 100%;
+}
+
+.prediction-frames figcaption {
+  color: #475569;
+  font-size: 12px;
+  margin-top: 6px;
+  text-align: center;
+}
+
+.prediction-stats {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.prediction-stats span {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #334155;
+  font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rollout-view {
+  display: grid;
+  gap: 10px;
+}
+
+.rollout-actions {
+  color: #334155;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.rollout-strip {
+  display: grid;
+  gap: 10px;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(170px, 190px);
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.rollout-step {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  min-width: 0;
+  padding: 9px;
+}
+
+.rollout-step-head,
+.rollout-meta {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.rollout-step-head {
+  margin-bottom: 8px;
+}
+
+.rollout-step-head strong {
+  font-size: 12px;
+}
+
+.rollout-step-head span,
+.rollout-meta span {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.rollout-images {
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 8px;
+}
+
+.rollout-images img {
+  aspect-ratio: 1;
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  image-rendering: pixelated;
+  min-width: 0;
+  width: 100%;
+}
+
 .metrics {
   align-self: start;
 }
@@ -335,5 +459,9 @@ button:disabled {
   .button-row {
     grid-template-columns: 1fr;
   }
-}
 
+  .prediction-frames,
+  .prediction-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

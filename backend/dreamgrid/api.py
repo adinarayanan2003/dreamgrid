@@ -1,14 +1,21 @@
 from __future__ import annotations
 
+import base64
+from functools import lru_cache
+from io import BytesIO
+from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+import numpy as np
+from PIL import Image
 from pydantic import BaseModel, Field
 
 from dreamgrid.env import GridRescueEnv
 from dreamgrid.evaluate import evaluate
+from dreamgrid.model import TorchUnavailableError, load_model, require_torch
 from dreamgrid.planners import PlanCandidate, make_planner
 from dreamgrid.types import ACTION_NAMES
 
@@ -23,12 +30,12 @@ class EpisodeRequest(BaseModel):
 
 class StepRequest(BaseModel):
     action: int | None = Field(default=None, ge=0, le=4)
-    planner: Literal["random", "astar", "random_shooting", "cem"] | None = None
+    planner: Literal["random", "astar", "random_shooting", "cem", "learned_mpc"] | None = None
 
 
 class PlanRequest(BaseModel):
     episode_id: str
-    planner: Literal["random", "astar", "random_shooting", "cem"] = "cem"
+    planner: Literal["random", "astar", "random_shooting", "cem", "learned_mpc"] = "cem"
     horizon: int = Field(default=12, ge=1, le=32)
     num_candidates: int = Field(default=256, ge=8, le=2048)
 
@@ -38,9 +45,21 @@ class RolloutRequest(BaseModel):
     actions: list[int] = Field(default_factory=list, max_length=64)
 
 
+class PredictNextRequest(BaseModel):
+    episode_id: str
+    action: int = Field(default=3, ge=0, le=4)
+    model_path: str | None = None
+
+
+class PredictRolloutRequest(BaseModel):
+    episode_id: str
+    actions: list[int] = Field(default_factory=list, min_length=1, max_length=16)
+    model_path: str | None = None
+
+
 class EvalRequest(BaseModel):
-    planners: list[Literal["random", "astar", "random_shooting", "cem"]] = Field(
-        default_factory=lambda: ["random", "astar", "random_shooting", "cem"]
+    planners: list[Literal["random", "astar", "random_shooting", "cem", "learned_mpc"]] = Field(
+        default_factory=lambda: ["random", "astar", "random_shooting", "cem", "learned_mpc"]
     )
     episodes: int = Field(default=6, ge=1, le=250)
     grid_size: int = Field(default=16, ge=8, le=32)
@@ -59,6 +78,7 @@ app.add_middleware(
 )
 
 SESSIONS: dict[str, GridRescueEnv] = {}
+DEFAULT_MODEL_PATH = Path(__file__).resolve().parents[2] / "experiments" / "world_model_v3_50ep.pt"
 
 
 @app.get("/api/health")
@@ -149,6 +169,115 @@ def rollout(request: RolloutRequest) -> dict:
     return {"frames": frames}
 
 
+@app.post("/api/models/predict-next")
+def predict_next(request: PredictNextRequest) -> dict:
+    env = _session(request.episode_id)
+    model_path = Path(request.model_path) if request.model_path else DEFAULT_MODEL_PATH
+    if not model_path.exists():
+        raise HTTPException(status_code=404, detail=f"model checkpoint not found: {model_path}")
+
+    current_obs = env.render()
+    actual_env = env.clone()
+    actual_result = actual_env.step(request.action)
+    actual_next = actual_result.obs
+
+    try:
+        torch = require_torch()
+        model = _cached_model(str(model_path.resolve()))
+    except TorchUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    obs_tensor = _obs_tensor(torch, current_obs)
+    action_tensor = torch.tensor([request.action]).long()
+    with torch.no_grad():
+        pred = model(obs_tensor, action_tensor)
+        pred_next = _tensor_to_uint8(pred["next_obs"][0])
+        predicted_reward = float(pred["reward"][0].detach().cpu())
+        predicted_done_probability = float(torch.sigmoid(pred["done_logit"][0]).detach().cpu())
+
+    error = _error_image(pred_next, actual_next)
+    return {
+        "model_id": model_path.name,
+        "action": request.action,
+        "action_name": ACTION_NAMES[request.action],
+        "current_image": _image_data_url(current_obs),
+        "actual_next_image": _image_data_url(actual_next),
+        "predicted_next_image": _image_data_url(pred_next),
+        "error_image": _image_data_url(error),
+        "actual_reward": actual_result.reward,
+        "actual_done": actual_result.done,
+        "actual_event": actual_result.info["event"],
+        "predicted_reward": predicted_reward,
+        "predicted_done_probability": predicted_done_probability,
+        "predicted_done": predicted_done_probability >= 0.5,
+    }
+
+
+@app.post("/api/models/predict-rollout")
+def predict_rollout(request: PredictRolloutRequest) -> dict:
+    env = _session(request.episode_id)
+    model_path = Path(request.model_path) if request.model_path else DEFAULT_MODEL_PATH
+    if not model_path.exists():
+        raise HTTPException(status_code=404, detail=f"model checkpoint not found: {model_path}")
+    invalid_actions = [action for action in request.actions if action not in ACTION_NAMES]
+    if invalid_actions:
+        raise HTTPException(status_code=400, detail=f"invalid actions: {invalid_actions}")
+
+    try:
+        torch = require_torch()
+        model = _cached_model(str(model_path.resolve()))
+    except TorchUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    actual_env = env.clone()
+    current_obs = env.render()
+    predicted_obs_tensor = _obs_tensor(torch, current_obs)
+    frames = []
+    cumulative_mse = 0.0
+    stopped = False
+
+    with torch.no_grad():
+        for step_idx, action in enumerate(request.actions, start=1):
+            if stopped:
+                break
+            actual_result = actual_env.step(action)
+            action_tensor = torch.tensor([action]).long()
+            pred = model(predicted_obs_tensor, action_tensor)
+            predicted_next = _tensor_to_uint8(pred["next_obs"][0])
+            error = _error_image(predicted_next, actual_result.obs)
+            frame_mse = _frame_mse(predicted_next, actual_result.obs)
+            cumulative_mse += frame_mse
+
+            frames.append(
+                {
+                    "step": step_idx,
+                    "action": action,
+                    "action_name": ACTION_NAMES[action],
+                    "actual_image": _image_data_url(actual_result.obs),
+                    "predicted_image": _image_data_url(predicted_next),
+                    "error_image": _image_data_url(error),
+                    "frame_mse": frame_mse,
+                    "actual_reward": actual_result.reward,
+                    "actual_done": actual_result.done,
+                    "actual_event": actual_result.info["event"],
+                    "predicted_reward": float(pred["reward"][0].detach().cpu()),
+                    "predicted_done_probability": float(
+                        torch.sigmoid(pred["done_logit"][0]).detach().cpu()
+                    ),
+                }
+            )
+            predicted_obs_tensor = _obs_tensor(torch, predicted_next)
+            stopped = actual_result.done
+
+    return {
+        "model_id": model_path.name,
+        "actions": request.actions,
+        "action_names": [ACTION_NAMES[action] for action in request.actions],
+        "frames": frames,
+        "avg_frame_mse": cumulative_mse / max(1, len(frames)),
+    }
+
+
 @app.post("/api/eval/run")
 def run_eval(request: EvalRequest) -> dict:
     return {
@@ -200,3 +329,39 @@ def _candidate_payload(candidate: PlanCandidate) -> dict:
         "path": candidate.path,
         "event": candidate.event,
     }
+
+
+@lru_cache(maxsize=4)
+def _cached_model(path: str):
+    return load_model(Path(path))
+
+
+def _tensor_to_uint8(tensor) -> np.ndarray:
+    array = tensor.detach().cpu().clamp(0, 1).permute(1, 2, 0).numpy()
+    return (array * 255).astype(np.uint8)
+
+
+def _obs_tensor(torch_module, image: np.ndarray):
+    return torch_module.tensor(image).float().permute(2, 0, 1).unsqueeze(0) / 255.0
+
+
+def _frame_mse(predicted: np.ndarray, actual: np.ndarray) -> float:
+    diff = predicted.astype(np.float32) / 255.0 - actual.astype(np.float32) / 255.0
+    return float(np.mean(diff**2))
+
+
+def _error_image(predicted: np.ndarray, actual: np.ndarray) -> np.ndarray:
+    error = np.abs(predicted.astype(np.float32) - actual.astype(np.float32)).mean(axis=2) / 255.0
+    scaled = np.clip(error * 8.0, 0.0, 1.0)
+    image = np.zeros((*scaled.shape, 3), dtype=np.uint8)
+    image[..., 0] = (scaled * 255).astype(np.uint8)
+    image[..., 1] = ((1.0 - scaled) * 70).astype(np.uint8)
+    image[..., 2] = ((1.0 - scaled) * 120).astype(np.uint8)
+    return image
+
+
+def _image_data_url(image: np.ndarray) -> str:
+    buffer = BytesIO()
+    Image.fromarray(image, mode="RGB").save(buffer, format="PNG")
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
