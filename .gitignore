@@ -18,6 +18,6 @@ experiments/*.pth
 experiments/*.gif
 experiments/**/*.png
 
-
-TODO.md 
+TODO.md
+AGENTS.md
 agents.md
