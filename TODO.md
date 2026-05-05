@@ -9,6 +9,8 @@
 - [x] Train validation-aware checkpoint: `experiments/world_model_v2.pt` with final `val_loss=0.06416`, `frame_mse=0.05650`, `reward_mae=0.05136`, `done_acc=0.987`.
 - [x] Export prediction contact sheets to `experiments/world_model_v2_samples/`.
 - [x] Train longer checkpoint: `experiments/world_model_v3_50ep.pt` for 50 CPU epochs; final `frame_mse=0.00393`, `reward_mae=0.01667`, `done_acc=0.986`.
+- [x] Capture dashboard screenshots for desktop and mobile documentation.
+- [x] Add research-style documentation: research report, architecture, contributing guide, and README links.
 
 ## Immediate Engineering Tasks
 
@@ -56,8 +58,8 @@
 
 ## Documentation Tasks
 
-- [ ] Write a technical report explaining model-based RL, learned simulators, and failure modes.
-- [ ] Add architecture diagram.
+- [x] Write a technical report explaining model-based RL, learned simulators, and failure modes.
+- [x] Add architecture diagram.
 - [ ] Add cloud GPU training instructions.
-- [ ] Add portfolio README section with demo story, metrics, and screenshots.
-- [ ] Document what is intentionally non-LLM about the project.
+- [x] Add portfolio README section with demo story, metrics, and screenshots.
+- [x] Document what is intentionally non-LLM about the project.
