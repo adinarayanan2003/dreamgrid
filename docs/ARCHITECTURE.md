@@ -85,6 +85,7 @@ FastAPI endpoints:
 | `POST /api/eval/run` | compare planners across episodes |
 | `POST /api/eval/learned-rollouts` | aggregate oracle-vs-learned rollout metrics by horizon |
 | `POST /api/eval/heldout` | evaluate planners and optional learned drift on held-out seed splits |
+| `POST /api/eval/heldout/replay` | replay one held-out split/scenario/seed/planner trace |
 
 Learned-model endpoints and `learned_mpc` resolve checkpoints in this order:
 
@@ -94,7 +95,7 @@ Learned-model endpoints and `learned_mpc` resolve checkpoints in this order:
 
 Missing checkpoints return an unavailable response instead of falling back to simulator rollouts.
 
-Held-out evaluation uses fixed seed ranges for `validation` and `test` splits, plus scenario configs for nominal maps, denser walls, and higher moving-hazard pressure. This keeps training-time smoke metrics separate from generalization checks.
+Held-out evaluation uses fixed seed ranges for `validation` and `test` splits, plus scenario configs for nominal maps, denser walls, and higher moving-hazard pressure. This keeps training-time smoke metrics separate from generalization checks. The CLI can export the full JSON payload, a flat CSV summary, and capped failure-case traces for collided or timed-out planner episodes. A replay endpoint reconstructs any split/scenario/seed/planner case as a step-by-step symbolic trace.
 
 ### Dashboard
 

@@ -138,6 +138,7 @@ def test_heldout_eval_runs_without_learned_rollouts() -> None:
     assert response.status_code == 200
     scenario = response.json()["metrics"]["splits"]["validation"]["scenarios"]["moving_hazards"]
     assert scenario["config"]["hazard_count"] == 6
+    assert "astar" in scenario["failure_cases"]
     assert scenario["learned_rollouts"] is None
 
 
@@ -157,3 +158,22 @@ def test_heldout_eval_returns_404_for_missing_checkpoint(monkeypatch) -> None:
     )
 
     assert response.status_code == 404
+
+
+def test_heldout_replay_returns_trace() -> None:
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/eval/heldout/replay",
+        json={
+            "split": "validation",
+            "scenario": "moving_hazards",
+            "seed": 10000,
+            "planner": "astar",
+        },
+    )
+
+    assert response.status_code == 200
+    replay = response.json()["replay"]
+    assert replay["final_event"] in {"goal", "collision", "timeout"}
+    assert replay["steps"][-1]["done"] is True

@@ -71,6 +71,7 @@ def main() -> None:
         DEFAULT_HELDOUT_SCENARIOS,
         DEFAULT_HELDOUT_SPLITS,
         evaluate_heldout,
+        write_heldout_artifacts,
     )
 
     parser = argparse.ArgumentParser(description="Evaluate DreamGrid planners.")
@@ -102,6 +103,9 @@ def main() -> None:
     parser.add_argument("--splits", nargs="+", default=list(DEFAULT_HELDOUT_SPLITS))
     parser.add_argument("--scenarios", nargs="+", default=list(DEFAULT_HELDOUT_SCENARIOS))
     parser.add_argument("--skip-learned-rollouts", action="store_true")
+    parser.add_argument("--max-failure-cases", type=int, default=8)
+    parser.add_argument("--out-json", default=None)
+    parser.add_argument("--out-csv", default=None)
     args = parser.parse_args()
     if args.heldout:
         summary = evaluate_heldout(
@@ -115,13 +119,18 @@ def main() -> None:
             rollout_horizons=args.rollout_horizons,
             include_learned_rollouts=not args.skip_learned_rollouts,
             model_path=args.model_path,
+            max_failure_cases=args.max_failure_cases,
         )
+        write_heldout_artifacts(summary, json_path=args.out_json, csv_path=args.out_csv)
         for split_name, split in summary["splits"].items():
             print(f"split={split_name} seed_start={split['seed_start']}")
             for scenario_name, scenario in split["scenarios"].items():
                 print(f"  scenario={scenario_name} config={scenario['config']}")
                 for planner, metrics in scenario["planners"].items():
                     print(f"    planner={planner} {metrics}")
+                    failures = scenario["failure_cases"].get(planner, [])
+                    if failures:
+                        print(f"      failures={len(failures)} first_seed={failures[0]['seed']}")
                 if scenario["learned_rollouts"]:
                     for horizon, metrics in scenario["learned_rollouts"]["horizons"].items():
                         print(f"    rollout_horizon={horizon} {metrics}")

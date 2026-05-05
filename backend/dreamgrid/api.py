@@ -15,7 +15,12 @@ from pydantic import BaseModel, Field
 
 from dreamgrid.env import GridRescueEnv
 from dreamgrid.evaluate import evaluate
-from dreamgrid.heldout import DEFAULT_HELDOUT_SCENARIOS, DEFAULT_HELDOUT_SPLITS, evaluate_heldout
+from dreamgrid.heldout import (
+    DEFAULT_HELDOUT_SCENARIOS,
+    DEFAULT_HELDOUT_SPLITS,
+    evaluate_heldout,
+    replay_heldout_case,
+)
 from dreamgrid.model import (
     ModelCheckpointUnavailableError,
     TorchUnavailableError,
@@ -109,6 +114,17 @@ class HeldoutEvalRequest(BaseModel):
     )
     include_learned_rollouts: bool = True
     model_path: str | None = None
+    max_failure_cases: int = Field(default=8, ge=0, le=50)
+
+
+class HeldoutReplayRequest(BaseModel):
+    split: Literal["validation", "test"] = "validation"
+    scenario: Literal["nominal", "dense_walls", "moving_hazards"] = "nominal"
+    seed: int = 10_000
+    planner: Literal["random", "astar", "random_shooting", "cem", "learned_mpc"] = "astar"
+    grid_size: int = Field(default=16, ge=8, le=32)
+    horizon: int = Field(default=6, ge=1, le=32)
+    num_candidates: int = Field(default=48, ge=8, le=2048)
 
 
 app = FastAPI(title="DreamGrid API", version="0.1.0")
@@ -367,6 +383,7 @@ def run_heldout_eval(request: HeldoutEvalRequest) -> dict:
             rollout_horizons=request.rollout_horizons,
             include_learned_rollouts=request.include_learned_rollouts,
             model_path=request.model_path,
+            max_failure_cases=request.max_failure_cases,
         )
     except TorchUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -375,6 +392,27 @@ def run_heldout_eval(request: HeldoutEvalRequest) -> dict:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"metrics": metrics}
+
+
+@app.post("/api/eval/heldout/replay")
+def replay_heldout_eval(request: HeldoutReplayRequest) -> dict:
+    try:
+        replay = replay_heldout_case(
+            split=request.split,
+            scenario=request.scenario,
+            seed=request.seed,
+            planner=request.planner,
+            grid_size=request.grid_size,
+            horizon=request.horizon,
+            num_candidates=request.num_candidates,
+        )
+    except TorchUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ModelCheckpointUnavailableError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"replay": replay}
 
 
 def _session(episode_id: str) -> GridRescueEnv:

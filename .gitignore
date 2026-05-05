@@ -17,6 +17,8 @@ experiments/*.pt
 !experiments/world_model_v3_50ep.pt
 experiments/*.pth
 experiments/*.gif
+experiments/*.json
+experiments/*.csv
 experiments/**/*.png
 
 TODO.md
