@@ -19,6 +19,7 @@ experiments/*.pth
 experiments/*.gif
 experiments/*.json
 experiments/*.csv
+experiments/**/*.gif
 experiments/**/*.png
 
 TODO.md

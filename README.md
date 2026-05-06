@@ -150,7 +150,8 @@ python -m dreamgrid.heldout --replay \
   --split validation \
   --scenario moving_hazards \
   --seed 10000 \
-  --planner astar
+  --planner astar \
+  --out-gif ../experiments/replays/astar-moving-hazards-10000.gif
 ```
 
 Run API/backend tests:

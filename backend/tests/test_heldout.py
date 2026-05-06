@@ -1,7 +1,14 @@
 import csv
 import json
 
-from dreamgrid.heldout import evaluate_heldout, replay_heldout_case, write_heldout_artifacts
+from PIL import Image
+
+from dreamgrid.heldout import (
+    evaluate_heldout,
+    replay_heldout_case,
+    write_heldout_artifacts,
+    write_replay_gif,
+)
 
 
 def test_evaluate_heldout_without_learned_rollouts() -> None:
@@ -57,3 +64,20 @@ def test_replay_heldout_case_returns_step_trace() -> None:
     assert replay["steps"]
     assert replay["final_event"] in {"goal", "collision", "timeout"}
     assert replay["steps"][-1]["done"] is True
+
+
+def test_write_replay_gif(tmp_path) -> None:
+    gif_path = tmp_path / "replay.gif"
+
+    write_replay_gif(
+        split="validation",
+        scenario="moving_hazards",
+        seed=10_000,
+        planner="astar",
+        path=gif_path,
+    )
+
+    with Image.open(gif_path) as image:
+        assert image.format == "GIF"
+        assert getattr(image, "is_animated", False)
+        assert image.n_frames >= 2
