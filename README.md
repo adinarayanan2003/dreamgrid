@@ -103,7 +103,10 @@ Generate a transition dataset:
 
 ```bash
 cd backend
-python -m dreamgrid.dataset --episodes 200 --out ../experiments/dataset_200.npz
+python -m dreamgrid.dataset \
+  --episodes 3000 \
+  --scenarios nominal moving_hazards \
+  --out ../experiments/dataset_mixed_3000.npz
 ```
 
 Train a latent world model:
@@ -111,11 +114,15 @@ Train a latent world model:
 ```bash
 cd backend
 python -m dreamgrid.train \
-  --dataset ../experiments/dataset_200.npz \
-  --epochs 10 \
-  --out ../experiments/world_model.pt \
-  --sample-dir ../experiments/world_model_samples
+  --dataset ../experiments/dataset_mixed_3000.npz \
+  --epochs 50 \
+  --out ../experiments/world_model_candidate.pt \
+  --best-out ../experiments/world_model_candidate_best.pt \
+  --metrics-out ../experiments/world_model_candidate_metrics.json \
+  --sample-dir ../experiments/world_model_candidate_samples
 ```
+
+Training writes both final and best-validation checkpoints. Candidate checkpoints stay opt-in until their held-out rollout and planner metrics beat the published default.
 
 Evaluate planners:
 
@@ -136,6 +143,7 @@ Evaluate held-out splits and stress scenarios:
 ```bash
 cd backend
 python -m dreamgrid.evaluate --heldout \
+  --model-path ../experiments/world_model_candidate_best.pt \
   --episodes-per-split 6 \
   --scenarios nominal moving_hazards \
   --out-json ../experiments/heldout.json \

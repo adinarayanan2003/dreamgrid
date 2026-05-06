@@ -114,13 +114,13 @@ The dashboard screenshots below show the interactive planning interface.
 
 - Learned rollout inspection and aggregate oracle-vs-learned metrics are API-backed.
 - Held-out validation/test seed splits are API-backed, and the CLI can export JSON/CSV tables plus replayable planner failure-case traces and GIFs.
-- The training script currently saves the final checkpoint, not the best-validation checkpoint.
+- The training script saves both final and best-validation checkpoints, but default checkpoint promotion is still a manual review step.
 - PyTorch reported `mps False` on the training machine, so the 50-epoch run was CPU-only.
 - The current model is a one-step latent CNN dynamics model, not a recurrent state-space model.
 - Classical planners still exploit simulator truth; learned MPC is available as an explicit separate planner.
 
 ## Next Milestones
 
-1. Save the best-validation checkpoint during training.
-2. Compare learned-model MPC against simulator MPC, A*, and random baselines.
-3. Improve learned MPC scoring using the replayed failure cases.
+1. Retrain a mixed-scenario candidate world model.
+2. Compare candidate learned-model MPC against CEM and the published default checkpoint.
+3. Promote the candidate checkpoint only after held-out rollout and planner metrics improve.

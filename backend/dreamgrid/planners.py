@@ -439,7 +439,13 @@ class LearnedMPCPlanner:
         return float(mask[row_start:row_end, col_start:col_end].mean())
 
 
-def make_planner(name: str, seed: int = 0, horizon: int = 12, num_candidates: int = 256) -> Planner:
+def make_planner(
+    name: str,
+    seed: int = 0,
+    horizon: int = 12,
+    num_candidates: int = 256,
+    model_path: str | Path | None = None,
+) -> Planner:
     if name == "random":
         return RandomPlanner(seed=seed)
     if name == "astar":
@@ -449,7 +455,12 @@ def make_planner(name: str, seed: int = 0, horizon: int = 12, num_candidates: in
     if name == "cem":
         return CEMPlanner(horizon=horizon, num_candidates=num_candidates, seed=seed)
     if name == "learned_mpc":
-        return LearnedMPCPlanner(horizon=horizon, num_candidates=num_candidates, seed=seed)
+        return LearnedMPCPlanner(
+            horizon=horizon,
+            num_candidates=num_candidates,
+            seed=seed,
+            model_path=model_path,
+        )
     raise ValueError(f"Unknown planner: {name}")
 
 

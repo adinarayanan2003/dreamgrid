@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import numpy as np
@@ -19,6 +20,11 @@ def train(
     seed: int = 0,
     device_name: str = "auto",
     sample_dir: Path | None = None,
+    best_out: Path | None = None,
+    metrics_out: Path | None = None,
+    frame_loss_weight: float = 1.0,
+    reward_loss_weight: float = 0.1,
+    done_loss_weight: float = 0.1,
 ) -> Path:
     torch = require_torch()
     from torch.nn import functional as F
@@ -58,10 +64,18 @@ def train(
     model = LatentWorldModel(WorldModelConfig()).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     history = []
+    best_metrics: dict[str, float] | None = None
+    best_state_dict = None
+    best_out = best_out or out.with_name(f"{out.stem}_best{out.suffix}")
+    loss_weights = {
+        "frame": frame_loss_weight,
+        "reward": reward_loss_weight,
+        "done": done_loss_weight,
+    }
 
     print(
         f"device={device} train_examples={len(train_ds)} val_examples={len(val_ds)} "
-        f"batch_size={batch_size}"
+        f"batch_size={batch_size} loss_weights={loss_weights}"
     )
 
     for epoch in range(epochs):
@@ -78,7 +92,14 @@ def train(
             recon = F.mse_loss(pred["next_obs"], batch_next)
             reward_loss = F.mse_loss(pred["reward"], batch_reward)
             done_loss = F.binary_cross_entropy_with_logits(pred["done_logit"], batch_done)
-            loss = recon + 0.1 * reward_loss + 0.1 * done_loss
+            loss = _weighted_loss(
+                recon,
+                reward_loss,
+                done_loss,
+                frame_loss_weight=frame_loss_weight,
+                reward_loss_weight=reward_loss_weight,
+                done_loss_weight=done_loss_weight,
+            )
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -86,9 +107,19 @@ def train(
             example_count += len(batch_action)
 
         train_loss = running / max(1, example_count)
-        val_metrics = _evaluate(model, val_loader, device)
+        val_metrics = _evaluate(
+            model,
+            val_loader,
+            device,
+            frame_loss_weight=frame_loss_weight,
+            reward_loss_weight=reward_loss_weight,
+            done_loss_weight=done_loss_weight,
+        )
         epoch_metrics = {"epoch": epoch + 1, "train_loss": train_loss, **val_metrics}
         history.append(epoch_metrics)
+        if best_metrics is None or val_metrics["val_loss"] < best_metrics["val_loss"]:
+            best_metrics = epoch_metrics
+            best_state_dict = _cpu_state_dict(model)
         print(
             f"epoch={epoch + 1} train_loss={train_loss:.5f} "
             f"val_loss={val_metrics['val_loss']:.5f} "
@@ -99,17 +130,48 @@ def train(
         if sample_dir is not None:
             _export_samples(model, val_ds, sample_dir, epoch + 1, device)
 
+    final_metrics = history[-1] if history else {}
+    metadata = {
+        "dataset": str(dataset),
+        "epochs": epochs,
+        "batch_size": batch_size,
+        "lr": lr,
+        "val_fraction": val_fraction,
+        "seed": seed,
+        "device": str(device),
+        "loss_weights": loss_weights,
+        "best_checkpoint": str(best_out),
+        "best_metrics": best_metrics or {},
+        "final_metrics": final_metrics,
+    }
+
     out.parent.mkdir(parents=True, exist_ok=True)
+    best_out.parent.mkdir(parents=True, exist_ok=True)
+    if best_state_dict is not None:
+        torch.save(
+            _checkpoint_payload(
+                model=model,
+                state_dict=best_state_dict,
+                history=history,
+                metadata=metadata,
+                checkpoint_kind="best_validation",
+            ),
+            best_out,
+        )
     torch.save(
-        {
-            "config": model.config.__dict__,
-            "state_dict": model.cpu().state_dict(),
-            "history": history,
-            "dataset": str(dataset),
-            "final_metrics": history[-1] if history else {},
-        },
+        _checkpoint_payload(
+            model=model,
+            state_dict=_cpu_state_dict(model),
+            history=history,
+            metadata=metadata,
+            checkpoint_kind="final",
+        ),
         out,
     )
+    if metrics_out is not None:
+        metrics_out.parent.mkdir(parents=True, exist_ok=True)
+        metrics_out.write_text(json.dumps({"history": history, "metadata": metadata}, indent=2) + "\n")
+    print(f"best_checkpoint={best_out} best_metrics={best_metrics or {}}")
     return out
 
 
@@ -127,7 +189,55 @@ def _resolve_device(torch_module, device_name: str):
     return torch_module.device(device_name)
 
 
-def _evaluate(model, loader, device) -> dict[str, float]:
+def _weighted_loss(
+    frame_loss,
+    reward_loss,
+    done_loss,
+    *,
+    frame_loss_weight: float,
+    reward_loss_weight: float,
+    done_loss_weight: float,
+):
+    return (
+        frame_loss_weight * frame_loss
+        + reward_loss_weight * reward_loss
+        + done_loss_weight * done_loss
+    )
+
+
+def _cpu_state_dict(model) -> dict:
+    return {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
+
+
+def _checkpoint_payload(
+    *,
+    model,
+    state_dict: dict,
+    history: list[dict[str, float]],
+    metadata: dict,
+    checkpoint_kind: str,
+) -> dict:
+    return {
+        "config": model.config.__dict__,
+        "state_dict": state_dict,
+        "history": history,
+        "dataset": metadata["dataset"],
+        "metadata": metadata,
+        "checkpoint_kind": checkpoint_kind,
+        "best_metrics": metadata["best_metrics"],
+        "final_metrics": metadata["final_metrics"],
+    }
+
+
+def _evaluate(
+    model,
+    loader,
+    device,
+    *,
+    frame_loss_weight: float,
+    reward_loss_weight: float,
+    done_loss_weight: float,
+) -> dict[str, float]:
     torch = require_torch()
     from torch.nn import functional as F
 
@@ -149,7 +259,14 @@ def _evaluate(model, loader, device) -> dict[str, float]:
             recon = F.mse_loss(pred["next_obs"], batch_next)
             reward_loss = F.mse_loss(pred["reward"], batch_reward)
             done_loss = F.binary_cross_entropy_with_logits(pred["done_logit"], batch_done)
-            loss = recon + 0.1 * reward_loss + 0.1 * done_loss
+            loss = _weighted_loss(
+                recon,
+                reward_loss,
+                done_loss,
+                frame_loss_weight=frame_loss_weight,
+                reward_loss_weight=reward_loss_weight,
+                done_loss_weight=done_loss_weight,
+            )
 
             batch_count = len(batch_action)
             total_loss += float(loss.detach()) * batch_count
@@ -222,6 +339,11 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda", "mps"])
     parser.add_argument("--sample-dir", type=Path, default=None)
+    parser.add_argument("--best-out", type=Path, default=None)
+    parser.add_argument("--metrics-out", type=Path, default=None)
+    parser.add_argument("--frame-loss-weight", type=float, default=1.0)
+    parser.add_argument("--reward-loss-weight", type=float, default=0.1)
+    parser.add_argument("--done-loss-weight", type=float, default=0.1)
     args = parser.parse_args()
     path = train(
         dataset=args.dataset,
@@ -233,6 +355,11 @@ def main() -> None:
         seed=args.seed,
         device_name=args.device,
         sample_dir=args.sample_dir,
+        best_out=args.best_out,
+        metrics_out=args.metrics_out,
+        frame_loss_weight=args.frame_loss_weight,
+        reward_loss_weight=args.reward_loss_weight,
+        done_loss_weight=args.done_loss_weight,
     )
     print(f"wrote {path}")
 
