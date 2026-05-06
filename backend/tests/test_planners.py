@@ -3,7 +3,7 @@ import pytest
 
 from dreamgrid.env import GridRescueEnv
 from dreamgrid.model import DEFAULT_MODEL_PATH, TorchUnavailableError, require_torch
-from dreamgrid.planners import AStarPlanner, CEMPlanner, LearnedMPCPlanner, RandomShootingPlanner
+from dreamgrid.planners import AStarPlanner, CEMPlanner, LearnedMPCPlanner, RandomShootingPlanner, make_planner
 
 
 def test_astar_returns_valid_action() -> None:
@@ -51,6 +51,35 @@ def test_learned_mpc_returns_valid_action() -> None:
 
     assert 0 <= plan.selected_action <= 4
     assert len(plan.candidates) > 0
+
+
+def test_make_planner_passes_model_path_to_learned_mpc(monkeypatch) -> None:
+    captured = {}
+
+    class FakeLearnedMPCPlanner:
+        def __init__(self, *, horizon: int, num_candidates: int, seed: int, model_path: str) -> None:
+            captured["horizon"] = horizon
+            captured["num_candidates"] = num_candidates
+            captured["seed"] = seed
+            captured["model_path"] = model_path
+
+    monkeypatch.setattr("dreamgrid.planners.LearnedMPCPlanner", FakeLearnedMPCPlanner)
+
+    planner = make_planner(
+        "learned_mpc",
+        horizon=3,
+        num_candidates=16,
+        seed=7,
+        model_path="/tmp/candidate.pt",
+    )
+
+    assert isinstance(planner, FakeLearnedMPCPlanner)
+    assert captured == {
+        "horizon": 3,
+        "num_candidates": 16,
+        "seed": 7,
+        "model_path": "/tmp/candidate.pt",
+    }
 
 
 def test_learned_mpc_visual_features_find_agent_and_goal() -> None:

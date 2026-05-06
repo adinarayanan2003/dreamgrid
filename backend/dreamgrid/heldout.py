@@ -40,6 +40,7 @@ def replay_heldout_case(
     grid_size: int = 16,
     horizon: int = 6,
     num_candidates: int = 48,
+    model_path: str | Path | None = None,
 ) -> dict:
     _select("splits", [split], DEFAULT_HELDOUT_SPLITS)
     _select("scenarios", [scenario], DEFAULT_HELDOUT_SCENARIOS)
@@ -55,6 +56,7 @@ def replay_heldout_case(
         seed=seed,
         horizon=horizon,
         num_candidates=num_candidates,
+        model_path=model_path,
     )
     initial_state = env.symbolic_state()
     steps = []
@@ -108,6 +110,7 @@ def write_replay_gif(
     grid_size: int = 16,
     horizon: int = 6,
     num_candidates: int = 48,
+    model_path: str | Path | None = None,
     duration_ms: int = 450,
 ) -> None:
     frames = _render_replay_frames(
@@ -118,6 +121,7 @@ def write_replay_gif(
         grid_size=grid_size,
         horizon=horizon,
         num_candidates=num_candidates,
+        model_path=model_path,
     )
     output = Path(path)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -170,6 +174,7 @@ def evaluate_heldout(
                 wall_density=scenario.wall_density,
                 horizon=horizon,
                 num_candidates=num_candidates,
+                model_path=model_path,
                 max_failure_cases=max_failure_cases,
             )
             learned_rollouts = None
@@ -217,6 +222,7 @@ def _evaluate_planners_with_failures(
     wall_density: float,
     horizon: int,
     num_candidates: int,
+    model_path: str | Path | None,
     max_failure_cases: int,
 ) -> tuple[dict[str, dict[str, float]], dict[str, list[dict]]]:
     rows_by_planner: dict[str, list[dict[str, float]]] = {}
@@ -238,6 +244,7 @@ def _evaluate_planners_with_failures(
                 seed=episode_seed,
                 horizon=horizon,
                 num_candidates=num_candidates,
+                model_path=model_path,
             )
             done = False
             event = "timeout"
@@ -304,6 +311,7 @@ def _render_replay_frames(
     grid_size: int,
     horizon: int,
     num_candidates: int,
+    model_path: str | Path | None,
 ) -> list[Image.Image]:
     _select("splits", [split], DEFAULT_HELDOUT_SPLITS)
     _select("scenarios", [scenario], DEFAULT_HELDOUT_SCENARIOS)
@@ -320,6 +328,7 @@ def _render_replay_frames(
         seed=seed,
         horizon=horizon,
         num_candidates=num_candidates,
+        model_path=model_path,
     )
     frames = [_image_from_env(env)]
     done = False
@@ -445,6 +454,7 @@ def main() -> None:
             grid_size=args.grid_size,
             horizon=args.horizon,
             num_candidates=args.num_candidates,
+            model_path=args.model_path,
         )
         if args.out_gif:
             write_replay_gif(
@@ -456,6 +466,7 @@ def main() -> None:
                 grid_size=args.grid_size,
                 horizon=args.horizon,
                 num_candidates=args.num_candidates,
+                model_path=args.model_path,
                 duration_ms=args.gif_duration_ms,
             )
         print(json.dumps(replay, indent=2, sort_keys=True))

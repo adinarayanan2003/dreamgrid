@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from collections import defaultdict
+from pathlib import Path
 
 from dreamgrid.env import GridRescueEnv
 from dreamgrid.planners import make_planner
@@ -18,6 +19,7 @@ def evaluate(
     wall_density: float = 0.16,
     horizon: int = 6,
     num_candidates: int = 48,
+    model_path: str | Path | None = None,
 ) -> dict[str, dict[str, float]]:
     results: dict[str, list[dict[str, float | str]]] = defaultdict(list)
 
@@ -35,6 +37,7 @@ def evaluate(
                 seed=seed + episode,
                 horizon=horizon,
                 num_candidates=num_candidates,
+                model_path=model_path,
             )
             done = False
             event = "timeout"
@@ -157,9 +160,10 @@ def main() -> None:
         args.seed,
         hazard_count=args.hazard_count,
         wall_density=args.wall_density,
-        horizon=args.horizon,
-        num_candidates=args.num_candidates,
-    )
+            horizon=args.horizon,
+            num_candidates=args.num_candidates,
+            model_path=args.model_path,
+        )
     for planner, metrics in summary.items():
         print(planner, metrics)
 

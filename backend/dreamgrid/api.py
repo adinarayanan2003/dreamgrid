@@ -44,6 +44,7 @@ class EpisodeRequest(BaseModel):
 class StepRequest(BaseModel):
     action: int | None = Field(default=None, ge=0, le=4)
     planner: Literal["random", "astar", "random_shooting", "cem", "learned_mpc"] | None = None
+    model_path: str | None = None
 
 
 class PlanRequest(BaseModel):
@@ -51,6 +52,7 @@ class PlanRequest(BaseModel):
     planner: Literal["random", "astar", "random_shooting", "cem", "learned_mpc"] = "cem"
     horizon: int = Field(default=12, ge=1, le=32)
     num_candidates: int = Field(default=256, ge=8, le=2048)
+    model_path: str | None = None
 
 
 class RolloutRequest(BaseModel):
@@ -79,6 +81,7 @@ class EvalRequest(BaseModel):
     seed: int = 100
     horizon: int = Field(default=6, ge=1, le=32)
     num_candidates: int = Field(default=48, ge=8, le=2048)
+    model_path: str | None = None
 
 
 class RolloutMetricsRequest(BaseModel):
@@ -125,6 +128,7 @@ class HeldoutReplayRequest(BaseModel):
     grid_size: int = Field(default=16, ge=8, le=32)
     horizon: int = Field(default=6, ge=1, le=32)
     num_candidates: int = Field(default=48, ge=8, le=2048)
+    model_path: str | None = None
 
 
 app = FastAPI(title="DreamGrid API", version="0.1.0")
@@ -169,7 +173,11 @@ def step_episode(episode_id: str, request: StepRequest) -> dict:
     env = _session(episode_id)
     if request.action is None:
         planner_name = request.planner or "cem"
-        plan = _make_planner(planner_name, seed=env.seed + env.step_count).plan(env)
+        plan = _make_planner(
+            planner_name,
+            seed=env.seed + env.step_count,
+            model_path=request.model_path,
+        ).plan(env)
         action = plan.selected_action
     else:
         action = request.action
@@ -192,6 +200,7 @@ def plan(request: PlanRequest) -> dict:
         seed=env.seed + env.step_count,
         horizon=request.horizon,
         num_candidates=request.num_candidates,
+        model_path=request.model_path,
     )
     result = planner.plan(env)
     return {
@@ -342,6 +351,7 @@ def run_eval(request: EvalRequest) -> dict:
             seed=request.seed,
             horizon=request.horizon,
             num_candidates=request.num_candidates,
+            model_path=request.model_path,
         )
     except TorchUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -405,6 +415,7 @@ def replay_heldout_eval(request: HeldoutReplayRequest) -> dict:
             grid_size=request.grid_size,
             horizon=request.horizon,
             num_candidates=request.num_candidates,
+            model_path=request.model_path,
         )
     except TorchUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
