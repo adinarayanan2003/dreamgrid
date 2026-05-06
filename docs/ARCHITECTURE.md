@@ -95,7 +95,7 @@ Learned-model endpoints and `learned_mpc` resolve checkpoints in this order:
 
 Missing checkpoints return an unavailable response instead of falling back to simulator rollouts.
 
-Held-out evaluation uses fixed seed ranges for `validation` and `test` splits, plus scenario configs for nominal maps, denser walls, and higher moving-hazard pressure. This keeps training-time smoke metrics separate from generalization checks. The CLI can export the full JSON payload, a flat CSV summary, and capped failure-case traces for collided or timed-out planner episodes. A replay endpoint reconstructs any split/scenario/seed/planner case as a step-by-step symbolic trace.
+Held-out evaluation uses fixed seed ranges for `validation` and `test` splits, plus scenario configs for nominal maps, denser walls, and higher moving-hazard pressure. This keeps training-time smoke metrics separate from generalization checks. The CLI can export the full JSON payload, a flat CSV summary, and capped failure-case traces for collided or timed-out planner episodes. A replay endpoint reconstructs any split/scenario/seed/planner case as a step-by-step symbolic trace, and the replay CLI can export the same episode as a GIF.
 
 ### Dashboard
 

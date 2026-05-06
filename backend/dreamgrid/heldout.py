@@ -7,6 +7,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal
 
+from PIL import Image
+
 from dreamgrid.env import GridRescueEnv
 from dreamgrid.planners import make_planner
 from dreamgrid.rollout_metrics import DEFAULT_ROLLOUT_HORIZONS, evaluate_learned_rollouts
@@ -95,6 +97,38 @@ def replay_heldout_case(
         "step_count": len(steps),
         "success": final_event == "goal",
     }
+
+
+def write_replay_gif(
+    split: str,
+    scenario: str,
+    seed: int,
+    planner: str,
+    path: str | Path,
+    grid_size: int = 16,
+    horizon: int = 6,
+    num_candidates: int = 48,
+    duration_ms: int = 450,
+) -> None:
+    frames = _render_replay_frames(
+        split=split,
+        scenario=scenario,
+        seed=seed,
+        planner=planner,
+        grid_size=grid_size,
+        horizon=horizon,
+        num_candidates=num_candidates,
+    )
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    frames[0].save(
+        output,
+        save_all=True,
+        append_images=frames[1:],
+        duration=duration_ms,
+        loop=0,
+        optimize=False,
+    )
 
 
 def evaluate_heldout(
@@ -262,6 +296,45 @@ def _summarize_planner_rows(rows_by_planner: dict[str, list[dict[str, float]]]) 
     return summary
 
 
+def _render_replay_frames(
+    split: str,
+    scenario: str,
+    seed: int,
+    planner: str,
+    grid_size: int,
+    horizon: int,
+    num_candidates: int,
+) -> list[Image.Image]:
+    _select("splits", [split], DEFAULT_HELDOUT_SPLITS)
+    _select("scenarios", [scenario], DEFAULT_HELDOUT_SCENARIOS)
+    scenario_config = DEFAULT_HELDOUT_SCENARIOS[scenario]
+    env = GridRescueEnv(
+        grid_size=grid_size,
+        hazard_count=scenario_config.hazard_count,
+        wall_density=scenario_config.wall_density,
+        tile_pixels=10,
+    )
+    env.reset(seed=seed)
+    planner_instance = make_planner(
+        planner,
+        seed=seed,
+        horizon=horizon,
+        num_candidates=num_candidates,
+    )
+    frames = [_image_from_env(env)]
+    done = False
+    while not done:
+        plan = planner_instance.plan(env)
+        result = env.step(plan.selected_action)
+        done = result.done
+        frames.append(_image_from_env(env))
+    return frames
+
+
+def _image_from_env(env: GridRescueEnv) -> Image.Image:
+    return Image.fromarray(env.render(), mode="RGB")
+
+
 def _write_summary_csv(summary: dict, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     columns = [
@@ -359,6 +432,8 @@ def main() -> None:
     parser.add_argument("--max-failure-cases", type=int, default=8)
     parser.add_argument("--out-json", default=None)
     parser.add_argument("--out-csv", default=None)
+    parser.add_argument("--out-gif", default=None)
+    parser.add_argument("--gif-duration-ms", type=int, default=450)
     args = parser.parse_args()
 
     if args.replay:
@@ -371,6 +446,18 @@ def main() -> None:
             horizon=args.horizon,
             num_candidates=args.num_candidates,
         )
+        if args.out_gif:
+            write_replay_gif(
+                split=args.split,
+                scenario=args.scenario,
+                seed=args.seed,
+                planner=args.planner,
+                path=args.out_gif,
+                grid_size=args.grid_size,
+                horizon=args.horizon,
+                num_candidates=args.num_candidates,
+                duration_ms=args.gif_duration_ms,
+            )
         print(json.dumps(replay, indent=2, sort_keys=True))
         return
 
