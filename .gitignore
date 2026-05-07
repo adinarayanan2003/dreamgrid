@@ -15,6 +15,7 @@ frontend/dist/
 experiments/*.npz
 experiments/*.pt
 !experiments/world_model_v3_50ep.pt
+!experiments/world_model_candidate_weighted_30ep_best.pt
 experiments/*.pth
 experiments/*.gif
 experiments/*.json

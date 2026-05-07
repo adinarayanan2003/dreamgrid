@@ -72,7 +72,7 @@ Implemented planners:
 - **Random shooting MPC:** samples action sequences, simulates them, and executes the first action from the best sequence.
 - **CEM planner:** iteratively biases action-sequence sampling toward high-scoring candidates.
 
-Current planners use simulator rollouts. Learned-model rollout scoring is a planned extension.
+Classical planners use simulator rollouts. `learned_mpc` uses recursive world-model predictions plus visual/reward/done scoring, making it the main test of whether learned dynamics can support action selection.
 
 ## Results
 
@@ -116,6 +116,8 @@ current frame | target next frame | predicted next frame | error heatmap
 ```
 
 These artifacts are ignored by git because they are generated experiment outputs.
+
+See [EXPERIMENTS.md](EXPERIMENTS.md) for the current experiment journal, selected contact sheet, replay artifact, and full held-out benchmark summary.
 
 The dashboard screenshots below show the interactive planning interface.
 

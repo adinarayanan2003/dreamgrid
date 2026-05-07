@@ -61,7 +61,7 @@ Generated training artifacts are ignored by git except for the published Git LFS
 
 On the 25-episode validation/test held-out benchmark across nominal, moving-hazard, and dense-wall scenarios, the promoted checkpoint improved learned MPC average success from `0.393` to `0.513` and reduced average collision rate from `0.220` to `0.133`. Horizon-5 frame MSE regressed from `0.0744` to `0.0807`, so it should be treated as a planner-optimized checkpoint rather than a visually superior rollout model.
 
-The trained checkpoint is tracked with Git LFS at `experiments/world_model_v3_50ep.pt`.
+The trained checkpoint is tracked with Git LFS at `experiments/world_model_v3_50ep.pt`. See the [experiment journal](docs/EXPERIMENTS.md) for the full benchmark table, contact sheet, replay artifact, and reproduction commands.
 
 See [docs/RESEARCH.md](docs/RESEARCH.md) for methodology, results, and limitations.
 
@@ -119,11 +119,13 @@ Train a latent world model:
 cd backend
 python -m dreamgrid.train \
   --dataset ../experiments/dataset_mixed_3000.npz \
-  --epochs 50 \
-  --out ../experiments/world_model_candidate.pt \
-  --best-out ../experiments/world_model_candidate_best.pt \
-  --metrics-out ../experiments/world_model_candidate_metrics.json \
-  --sample-dir ../experiments/world_model_candidate_samples
+  --epochs 30 \
+  --reward-loss-weight 0.5 \
+  --done-loss-weight 0.2 \
+  --out ../experiments/world_model_candidate_weighted_30ep.pt \
+  --best-out ../experiments/world_model_candidate_weighted_30ep_best.pt \
+  --metrics-out ../experiments/world_model_candidate_weighted_30ep_metrics.json \
+  --sample-dir ../experiments/world_model_candidate_weighted_30ep_samples
 ```
 
 Training writes both final and best-validation checkpoints. Candidate checkpoints stay opt-in until their held-out rollout and planner metrics beat the published default.
@@ -147,11 +149,14 @@ Evaluate held-out splits and stress scenarios:
 ```bash
 cd backend
 python -m dreamgrid.evaluate --heldout \
-  --model-path ../experiments/world_model_candidate_best.pt \
-  --episodes-per-split 6 \
-  --scenarios nominal moving_hazards \
-  --out-json ../experiments/heldout.json \
-  --out-csv ../experiments/heldout.csv
+  --planners cem learned_mpc \
+  --episodes-per-split 25 \
+  --splits validation test \
+  --scenarios nominal moving_hazards dense_walls \
+  --rollout-horizons 1 3 5 10 \
+  --model-path ../experiments/world_model_candidate_weighted_30ep_best.pt \
+  --out-json ../experiments/heldout_candidate_weighted_30ep_full.json \
+  --out-csv ../experiments/heldout_candidate_weighted_30ep_full.csv
 ```
 
 Replay one held-out failure case:
@@ -183,9 +188,10 @@ npm run build
 ## Project Docs
 
 - [Research report](docs/RESEARCH.md)
+- [Experiment journal](docs/EXPERIMENTS.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Experiment artifact index](experiments/README.md)
 - [Contributing](CONTRIBUTING.md)
-- [TODO](TODO.md)
 
 Experiment datasets and sample images are ignored by git. The published checkpoint is stored with Git LFS; run `git lfs pull` if your clone does not download it automatically.

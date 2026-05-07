@@ -45,7 +45,7 @@ Planner implementations share a `plan(env)` interface and return:
 - candidate action sequences
 - candidate paths/events
 
-The current CEM and random-shooting planners use cloned simulator state for rollout scoring. This keeps the dashboard useful while learned-model planning is still under development.
+CEM and random-shooting planners use cloned simulator state for rollout scoring. `learned_mpc` is the non-oracle planner path: it scores sampled action sequences through recursive world-model predictions and uses the configured checkpoint.
 
 ### World Model
 
@@ -67,6 +67,8 @@ The checkpoint stores:
 - dataset path
 - training history
 - final metrics
+- best-validation metrics
+- training metadata such as loss weights and seed
 
 ### API
 
@@ -108,7 +110,7 @@ The dashboard contains:
 - learned rollout drift metrics
 - responsive desktop/mobile layout
 
-Current dashboard screenshots are stored under `docs/assets/`.
+Current dashboard screenshots, contact sheets, and selected replay media are stored under `docs/assets/`. The generated originals live in `experiments/` and are ignored unless explicitly promoted.
 
 ## Data Flow
 

@@ -16,7 +16,7 @@ DreamGrid currently has a complete simulator/planner/dashboard MVP plus a traine
 - [x] Generate mixed-policy transition datasets.
 - [x] Train a latent CNN dynamics model on image observations.
 - [x] Track one-step prediction metrics.
-- [ ] Save best-validation checkpoint during training.
+- [x] Save best-validation checkpoint during training.
 - [x] Track multi-step prediction error.
 - [x] Add model checkpoints to the API planner path.
 
@@ -31,6 +31,8 @@ DreamGrid currently has a complete simulator/planner/dashboard MVP plus a traine
 
 ## Phase 4: Frontier Extensions
 
+- [ ] Add multi-objective checkpoint selection for planner score and rollout fidelity.
+- [ ] Add periodic checkpointing/resume support for long local training runs.
 - [ ] Ensemble world models for uncertainty-aware planning.
 - [ ] Partial observability with recurrent latent dynamics.
 - [ ] Domain randomization across visual themes.
