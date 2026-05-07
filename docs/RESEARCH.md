@@ -76,23 +76,36 @@ Current planners use simulator rollouts. Learned-model rollout scoring is a plan
 
 ## Results
 
-The best recorded training run used `dataset_1000.npz` and trained for 50 CPU epochs.
+The default checkpoint is now the best-validation checkpoint from a 30-epoch mixed-scenario run. This run was selected because it improves learned MPC behavior on held-out validation/test seeds, not because it has the best decoded-frame fidelity.
 
 | Metric | Value |
 | --- | ---: |
-| Final train loss | 0.00315 |
-| Final validation loss | 0.02049 |
-| Final frame MSE | 0.00393 |
-| Final reward MAE | 0.01667 |
-| Final done accuracy | 0.986 |
-| Best validation loss | 0.01515 at epoch 17 |
+| Dataset episodes | 3,000 |
+| Dataset transitions | 104,958 |
+| Loss weights | frame 1.0, reward 0.5, done 0.2 |
+| Best validation loss | 0.04116 at epoch 12 |
+| Best frame MSE | 0.01647 |
+| Best reward MAE | 0.02715 |
+| Best done accuracy | 0.9815 |
 
-The frame prediction error improved substantially compared with early checkpoints:
+On the 25-episode validation/test held-out benchmark across nominal, moving-hazard, and dense-wall scenarios, the promoted checkpoint improved learned MPC planner outcomes:
+
+| Metric | Previous default | Promoted checkpoint |
+| --- | ---: | ---: |
+| Average learned MPC success rate | 0.393 | 0.513 |
+| Average learned MPC collision rate | 0.220 | 0.133 |
+| Average learned MPC reward | -0.837 | -0.602 |
+| Average horizon-5 frame MSE | 0.0744 | 0.0807 |
+| Average horizon-5 reward MAE | 0.0680 | 0.2082 |
+| Average horizon-5 done accuracy | 0.972 | 0.792 |
+
+The promoted checkpoint is therefore planner-optimized: it reduces collisions and improves success, while regressing visual rollout and scalar-head fidelity at longer horizons.
 
 | Checkpoint | Epochs | Frame MSE |
 | --- | ---: | ---: |
 | `world_model_v2.pt` | 2 | 0.05650 |
-| `world_model_v3_50ep.pt` | 50 | 0.00393 |
+| previous `world_model_v3_50ep.pt` | 50 | 0.00393 |
+| promoted `world_model_v3_50ep.pt` | 30 | 0.01647 |
 
 ## Qualitative Evidence
 
@@ -114,13 +127,13 @@ The dashboard screenshots below show the interactive planning interface.
 
 - Learned rollout inspection and aggregate oracle-vs-learned metrics are API-backed.
 - Held-out validation/test seed splits are API-backed, and the CLI can export JSON/CSV tables plus replayable planner failure-case traces and GIFs.
-- The training script saves both final and best-validation checkpoints, but default checkpoint promotion is still a manual review step.
-- PyTorch reported `mps False` on the training machine, so the 50-epoch run was CPU-only.
+- The training script saves both final and best-validation checkpoints; default checkpoint promotion remains a manual review step.
+- The promoted checkpoint was trained locally with stronger reward/done loss weights to improve learned MPC behavior.
 - The current model is a one-step latent CNN dynamics model, not a recurrent state-space model.
 - Classical planners still exploit simulator truth; learned MPC is available as an explicit separate planner.
 
 ## Next Milestones
 
-1. Retrain a mixed-scenario candidate world model.
-2. Compare candidate learned-model MPC against CEM and the published default checkpoint.
-3. Promote the candidate checkpoint only after held-out rollout and planner metrics improve.
+1. Add multi-objective checkpoint selection so planner score and rollout fidelity can be tracked separately.
+2. Train a checkpoint that preserves the promoted planner gains while recovering visual rollout fidelity.
+3. Add periodic checkpoint writes to make long CPU/MPS training runs easier to resume.

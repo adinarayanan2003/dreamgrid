@@ -40,22 +40,26 @@ Limitations:
 
 - Classical planners still use the true simulator for rollout scoring.
 - Learned rollouts and learned MPC require PyTorch plus a local checkpoint.
-- Oracle-vs-learned aggregate rollout metrics are still pending.
+- Held-out learned rollout and planner metrics are available through the API and CLI.
 
 ## Results Snapshot
 
-Generated training artifacts are ignored by git except for the published Git LFS checkpoint. The latest recorded run produced:
+Generated training artifacts are ignored by git except for the published Git LFS checkpoint. The current default checkpoint is planner-optimized: it improves learned MPC success and collision rates, while trading off visual rollout fidelity.
 
 | Artifact | Value |
 | --- | --- |
-| Dataset | `dataset_1000.npz` |
-| Episodes | `1,000` |
-| Transitions | `38,881` |
+| Dataset | `dataset_mixed_3000.npz` |
+| Episodes | `3,000` |
+| Transitions | `104,958` |
 | Best trained checkpoint | `world_model_v3_50ep.pt` |
-| Final frame MSE | `0.00393` |
-| Final reward MAE | `0.01667` |
-| Final done accuracy | `0.986` |
-| Best validation loss epoch | `17` |
+| Source run | `world_model_candidate_weighted_30ep_best.pt` |
+| Best validation loss epoch | `12` |
+| Best validation loss | `0.04116` |
+| Best frame MSE | `0.01647` |
+| Best reward MAE | `0.02715` |
+| Best done accuracy | `0.9815` |
+
+On the 25-episode validation/test held-out benchmark across nominal, moving-hazard, and dense-wall scenarios, the promoted checkpoint improved learned MPC average success from `0.393` to `0.513` and reduced average collision rate from `0.220` to `0.133`. Horizon-5 frame MSE regressed from `0.0744` to `0.0807`, so it should be treated as a planner-optimized checkpoint rather than a visually superior rollout model.
 
 The trained checkpoint is tracked with Git LFS at `experiments/world_model_v3_50ep.pt`.
 
