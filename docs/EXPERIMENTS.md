@@ -16,6 +16,7 @@ Can a compact visual world model support useful learned MPC planning, even if de
   - reward: `0.5`
   - done: `0.2`
 - Promoted the best-validation checkpoint from epoch 12 as the default `experiments/world_model_v3_50ep.pt`.
+- Tracked the promoted source checkpoint as `experiments/world_model_candidate_weighted_30ep_best.pt` through Git LFS for reproducibility.
 
 The checkpoint was selected for planner behavior, not visual fidelity. The main result is lower learned MPC collision rates across all full held-out splits.
 

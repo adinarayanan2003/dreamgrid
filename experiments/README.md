@@ -16,6 +16,12 @@ experiments/world_model_v3_50ep.pt
 
 That file is tracked with Git LFS and is the checkpoint used by learned rollout endpoints and `learned_mpc` by default.
 
+The promoted source checkpoint is also tracked for reproducibility:
+
+```text
+experiments/world_model_candidate_weighted_30ep_best.pt
+```
+
 ## Current Local Artifacts
 
 The May 2026 planner-optimized checkpoint came from:
