@@ -39,6 +39,12 @@ class _VisualFeatures:
     action_scores: tuple[float, ...] | None
 
 
+@dataclass(frozen=True)
+class _FirstActionGate:
+    adjustments: tuple[float, ...]
+    preferred_actions: frozenset[int]
+
+
 class Planner(Protocol):
     def plan(self, env: GridRescueEnv) -> PlanResult:
         ...
@@ -161,6 +167,11 @@ class LearnedMPCPlanner:
     _HAZARD_WEIGHT = 0.45
     _ACTION_PRIOR_WEIGHT = 2.5
     _TARGET_HAZARD_PRIOR_WEIGHT = 0.22
+    _FIRST_ACTION_PROGRESS_BONUS = 0.25
+    _FIRST_ACTION_INVALID_PENALTY = 4.0
+    _FIRST_ACTION_NON_PROGRESS_PENALTY = 0.7
+    _FIRST_ACTION_STAY_PENALTY = 0.85
+    _FIRST_ACTION_HAZARD_PENALTY = 0.7
     _SOFT_DONE_PENALTY = 0.08
     _BAD_TERMINAL_PENALTY = 0.85
     _STAY_PENALTY = 0.015
@@ -190,11 +201,39 @@ class LearnedMPCPlanner:
                 f"got {current_obs.shape[0]}x{current_obs.shape[1]}"
             )
         sequences = self.rng.integers(0, len(ACTION_NAMES), size=(self.num_candidates, self.horizon))
-        candidates = [self._score_sequence(current_obs, seq.tolist()) for seq in sequences]
+        self._cover_first_actions(sequences)
+        first_action_gate = self._first_action_gate(current_obs)
+        candidates = []
+        for seq in sequences:
+            candidate = self._score_sequence(current_obs, seq.tolist())
+            if candidate.actions and first_action_gate is not None:
+                candidate.score += first_action_gate.adjustments[candidate.actions[0]]
+            candidates.append(candidate)
         candidates.sort(key=lambda candidate: candidate.score, reverse=True)
+        if first_action_gate is not None and first_action_gate.preferred_actions:
+            preferred_candidates = [
+                candidate
+                for candidate in candidates
+                if candidate.actions and candidate.actions[0] in first_action_gate.preferred_actions
+            ]
+            if preferred_candidates:
+                remaining_candidates = [
+                    candidate
+                    for candidate in candidates
+                    if not candidate.actions
+                    or candidate.actions[0] not in first_action_gate.preferred_actions
+                ]
+                candidates = preferred_candidates + remaining_candidates
         best = candidates[0]
         action = best.actions[0] if best.actions else 4
         return PlanResult(action, ACTION_NAMES[action], best.score, candidates[:8])
+
+    @staticmethod
+    def _cover_first_actions(sequences: np.ndarray) -> None:
+        if sequences.ndim != 2 or sequences.shape[0] == 0 or sequences.shape[1] == 0:
+            return
+        for action in range(min(len(ACTION_NAMES), sequences.shape[0])):
+            sequences[action, 0] = action
 
     def _score_sequence(self, current_obs: np.ndarray, actions: list[int]) -> PlanCandidate:
         obs_tensor = self._obs_tensor(current_obs)
@@ -265,6 +304,99 @@ class LearnedMPCPlanner:
         else:
             score -= cls._SOFT_DONE_PENALTY * done_probability
         return float(score)
+
+    @classmethod
+    def _first_action_adjustments(cls, frame: object) -> tuple[float, ...] | None:
+        gate = cls._first_action_gate(frame)
+        if gate is None:
+            return None
+        return gate.adjustments
+
+    @classmethod
+    def _first_action_gate(cls, frame: object) -> _FirstActionGate | None:
+        image = cls._frame_to_rgb(frame)
+        agent_mask = cls._palette_mask(image, cls._PALETTE["agent"])
+        goal_mask = cls._palette_mask(image, cls._PALETTE["goal"])
+        wall_mask = cls._palette_mask(image, cls._PALETTE["wall"])
+        hazard_mask = cls._palette_mask(image, cls._PALETTE["hazard"])
+
+        agent_center, agent_confidence = cls._weighted_centroid(agent_mask)
+        goal_center, goal_confidence = cls._weighted_centroid(goal_mask)
+        if agent_center is None or goal_center is None:
+            return None
+        if min(agent_confidence, goal_confidence) < 0.75:
+            return None
+
+        agent_pixels = int(np.count_nonzero(agent_mask >= cls._MASK_THRESHOLD))
+        tile_step = max(1.0, float(np.sqrt(max(1, agent_pixels))))
+        height, width = image.shape[:2]
+        current_distance = cls._l1_distance(agent_center, goal_center)
+        progress_margin = tile_step * 0.25
+
+        assessments: list[dict[str, float | bool]] = []
+        for action in range(len(ACTION_NAMES)):
+            delta = ACTION_TO_DELTA[action]
+            target = (
+                agent_center[0] + delta.row * tile_step,
+                agent_center[1] + delta.col * tile_step,
+            )
+            in_bounds = 0 <= target[0] < height and 0 <= target[1] < width
+            wall_strength = cls._tile_mean(wall_mask, target, tile_step) if in_bounds else 1.0
+            hazard_strength = cls._tile_mean(hazard_mask, target, tile_step) if in_bounds else 0.0
+            hazard_risk = cls._hazard_risk(image.shape, target, hazard_mask) if in_bounds else 0.0
+            valid = in_bounds and wall_strength <= 0.25
+            safe = valid and hazard_strength <= 0.2
+            target_distance = cls._l1_distance(target, goal_center)
+            progress = action != 4 and safe and target_distance < current_distance - progress_margin
+            assessments.append(
+                {
+                    "valid": valid,
+                    "safe": safe,
+                    "progress": progress,
+                    "hazard_strength": hazard_strength,
+                    "hazard_risk": hazard_risk,
+                }
+            )
+
+        has_safe_progress = any(bool(item["progress"]) for item in assessments)
+        has_safe_move = any(
+            action != 4 and bool(item["safe"]) for action, item in enumerate(assessments)
+        )
+        if has_safe_progress:
+            preferred_actions = frozenset(
+                action for action, item in enumerate(assessments) if bool(item["progress"])
+            )
+        elif has_safe_move:
+            preferred_actions = frozenset(
+                action
+                for action, item in enumerate(assessments)
+                if action != 4 and bool(item["safe"])
+            )
+        else:
+            preferred_actions = frozenset(
+                action for action, item in enumerate(assessments) if bool(item["valid"])
+            )
+
+        adjustments: list[float] = []
+        for action, assessment in enumerate(assessments):
+            adjustment = 0.0
+            if not bool(assessment["valid"]):
+                adjustment -= cls._FIRST_ACTION_INVALID_PENALTY
+            else:
+                adjustment -= cls._FIRST_ACTION_HAZARD_PENALTY * float(
+                    assessment["hazard_strength"]
+                )
+                if has_safe_progress:
+                    if action == 4:
+                        adjustment -= cls._FIRST_ACTION_STAY_PENALTY
+                    elif bool(assessment["progress"]):
+                        adjustment += cls._FIRST_ACTION_PROGRESS_BONUS
+                    else:
+                        adjustment -= cls._FIRST_ACTION_NON_PROGRESS_PENALTY
+                elif has_safe_move and action == 4:
+                    adjustment -= cls._FIRST_ACTION_STAY_PENALTY * 0.25
+            adjustments.append(float(adjustment))
+        return _FirstActionGate(tuple(adjustments), preferred_actions)
 
     @classmethod
     def _visual_features(cls, frame: object) -> _VisualFeatures:
@@ -347,6 +479,10 @@ class LearnedMPCPlanner:
         height, width = shape[:2]
         diagonal = max(1.0, float(np.hypot(height - 1, width - 1)))
         return float(np.hypot(first[0] - second[0], first[1] - second[1]) / diagonal)
+
+    @staticmethod
+    def _l1_distance(first: tuple[float, float], second: tuple[float, float]) -> float:
+        return float(abs(first[0] - second[0]) + abs(first[1] - second[1]))
 
     @classmethod
     def _hazard_risk(
@@ -434,6 +570,19 @@ class LearnedMPCPlanner:
         row_end = min(mask.shape[0], row + radius + 1)
         col_start = max(0, col - radius)
         col_end = min(mask.shape[1], col + radius + 1)
+        if row_start >= row_end or col_start >= col_end:
+            return 0.0
+        return float(mask[row_start:row_end, col_start:col_end].mean())
+
+    @staticmethod
+    def _tile_mean(mask: np.ndarray, center: tuple[float, float], tile_step: float) -> float:
+        tile_size = max(1, int(round(tile_step)))
+        row_start = int(round(center[0] - (tile_size / 2.0) + 0.5))
+        col_start = int(round(center[1] - (tile_size / 2.0) + 0.5))
+        row_start = max(0, min(mask.shape[0], row_start))
+        col_start = max(0, min(mask.shape[1], col_start))
+        row_end = max(row_start, min(mask.shape[0], row_start + tile_size))
+        col_end = max(col_start, min(mask.shape[1], col_start + tile_size))
         if row_start >= row_end or col_start >= col_end:
             return 0.0
         return float(mask[row_start:row_end, col_start:col_end].mean())

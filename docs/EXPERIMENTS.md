@@ -2,6 +2,32 @@
 
 This journal records the model and planner experiments that shaped the current checkpoint. Generated datasets, logs, metrics JSON, contact sheets, and checkpoints live under `experiments/` and are mostly ignored by git; this document keeps the durable summary.
 
+## 2026-05-08: Learned MPC First-Action Gate
+
+### Question
+
+Why did manual dashboard testing show candidate sequences that started with `left`, `up`, or `stay` when the agent clearly needed to move toward the lower-right goal?
+
+### What Changed
+
+- Added a current-observation first-action gate to learned MPC.
+- The gate reads the current rendered RGB board and marks wall moves, direct visible hazards, and avoidable no-ops as poor first actions.
+- Candidate scoring still uses recursive learned world-model rollouts.
+- Candidate selection now prefers sequences whose first action is safe and locally sensible, because MPC executes only that first action before replanning.
+- The dashboard now separates the executed `Next action` from the speculative rollout tail.
+
+### Diagnostic Result
+
+Before the gate, a small early-step sweep found learned MPC could choose `stay` or non-progress moves because later imagined rewards outweighed an obviously bad first action. After the gate, the same acceptance check returned `0` bad first actions across `199` early learned-MPC decisions when accounting for walls and visible hazards.
+
+### Interpretation
+
+This was a planner-selection issue, not a reason to retrain immediately. The learned world model still produces noisy multi-step rollout tails, but receding-horizon control only commits the first action. The current status is:
+
+- learned MPC first-action behavior is coherent;
+- full imagined rollouts are still imperfect;
+- next research work should target rollout fidelity, hazard-motion prediction, and stronger time-aware baselines.
+
 ## 2026-05-07: Planner-Optimized World Model
 
 ### Question

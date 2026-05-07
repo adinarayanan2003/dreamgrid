@@ -30,6 +30,7 @@ export function App() {
   const [episode, setEpisode] = useState<EpisodePayload | null>(null);
   const [planner, setPlanner] = useState<PlannerName>('cem');
   const [plan, setPlan] = useState<PlanCandidate[]>([]);
+  const [selectedActionName, setSelectedActionName] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<EvalMetrics>({});
   const [rolloutMetrics, setRolloutMetrics] = useState<RolloutEvalMetrics | null>(null);
   const [prediction, setPrediction] = useState<PredictionPayload | null>(null);
@@ -53,6 +54,7 @@ export function App() {
       const payload = await createEpisode(nextSeed);
       setEpisode(payload);
       setPlan([]);
+      setSelectedActionName(null);
       setPrediction(null);
       setRolloutPrediction(null);
       setStatus('Ready');
@@ -70,6 +72,7 @@ export function App() {
     try {
       const payload = await planEpisode(episode.episode_id, planner, horizon, numCandidates);
       setPlan(payload.candidates);
+      setSelectedActionName(payload.selected_action_name);
       setPrediction(null);
       setRolloutPrediction(null);
       setStatus(`${payload.selected_action_name} selected`);
@@ -89,6 +92,7 @@ export function App() {
       setEpisode(payload);
       const planPayload = await planEpisode(payload.episode_id, planner, horizon, numCandidates);
       setPlan(planPayload.candidates);
+      setSelectedActionName(planPayload.selected_action_name);
       setPrediction(null);
       setRolloutPrediction(null);
       setStatus(payload.event);
@@ -261,8 +265,14 @@ export function App() {
           <div className="panel imagination">
             <div className="panel-title">
               <h2>Imagined Candidates</h2>
-              <span>{plan.length} rollouts</span>
+              <span>{selectedActionName ? `executes ${selectedActionName}` : `${plan.length} rollouts`}</span>
             </div>
+            {selectedActionName && (
+              <div className="selected-action">
+                <span>Next action</span>
+                <strong>{selectedActionName}</strong>
+              </div>
+            )}
             <div className="candidate-list">
               {plan.map((candidate, index) => (
                 <CandidateRow key={`${candidate.score}-${index}`} candidate={candidate} index={index} />
@@ -360,6 +370,9 @@ function Grid({ state, path }: { state: EpisodePayload['state']; path: CellPos[]
 }
 
 function CandidateRow({ candidate, index }: { candidate: PlanCandidate; index: number }) {
+  const firstAction = candidate.action_names[0] ?? 'stay';
+  const rolloutTail = candidate.action_names.slice(1, 12);
+
   return (
     <div className="candidate">
       <div className="candidate-head">
@@ -367,7 +380,16 @@ function CandidateRow({ candidate, index }: { candidate: PlanCandidate; index: n
         <span>{candidate.event}</span>
         <span>{candidate.score.toFixed(3)}</span>
       </div>
-      <div className="actions">{candidate.action_names.slice(0, 12).join(' -> ')}</div>
+      <div className="candidate-actions">
+        <div className="candidate-action-primary">
+          <span>First</span>
+          <strong>{firstAction}</strong>
+        </div>
+        <div className="candidate-tail">
+          <span>Rollout</span>
+          <div>{rolloutTail.length > 0 ? rolloutTail.join(' -> ') : 'complete'}</div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -45,7 +45,7 @@ Planner implementations share a `plan(env)` interface and return:
 - candidate action sequences
 - candidate paths/events
 
-CEM and random-shooting planners use cloned simulator state for rollout scoring. `learned_mpc` is the non-oracle planner path: it scores sampled action sequences through recursive world-model predictions and uses the configured checkpoint.
+CEM and random-shooting planners use cloned simulator state for rollout scoring. `learned_mpc` is the non-oracle planner path: it scores sampled action sequences through recursive world-model predictions and uses the configured checkpoint. Because MPC executes only the first action before replanning, learned MPC also applies an observation-only first-action gate from the current RGB frame to avoid wall moves, direct visible hazards, and avoidable no-ops when safe progress actions are available.
 
 ### World Model
 
@@ -110,6 +110,8 @@ The dashboard contains:
 - learned rollout drift metrics
 - responsive desktop/mobile layout
 
+Candidate rows separate the action that will execute from the speculative rollout tail. The "Next action" label comes from the selected planner result; the remaining candidate actions are imagined context used for scoring and are not committed as an open-loop plan.
+
 Current dashboard screenshots, contact sheets, and selected replay media are stored under `docs/assets/`. The generated originals live in `experiments/` and are ignored unless explicitly promoted.
 
 ## Data Flow
@@ -121,7 +123,10 @@ user selects planner
   -> dashboard calls /api/planners/plan
   -> backend clones current env
   -> planner scores candidate futures
-  -> dashboard renders selected candidate summaries
+  -> dashboard renders selected first action and candidate summaries
+  -> user executes one planner step
+  -> backend advances the real env once
+  -> next planner call replans from the updated real state
 ```
 
 ### Training
@@ -140,4 +145,5 @@ dataset CLI generates transitions
 - Keep the environment small enough for CPU smoke tests.
 - Keep generated datasets outside git and publish reusable checkpoints through Git LFS or release artifacts.
 - Preserve a clear boundary between simulator planning and learned-model planning.
+- Keep learned MPC observation-only; it may inspect the rendered frame but must not use hidden simulator state for its learned-rollout scores.
 - Use visual diagnostics because world-model quality cannot be judged by scalar loss alone.
