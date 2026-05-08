@@ -30,6 +30,7 @@ Implemented:
 
 - Deterministic `GridRescueEnv` with RGB rendering and symbolic state.
 - Random, A*, random-shooting, and CEM planners.
+- Learned MPC with a current-observation first-action gate for wall, no-op, and visible-hazard sanity checks.
 - Dataset generation and planner evaluation CLIs.
 - FastAPI backend for episodes, planner calls, rollouts, and evaluation.
 - React/Vite dashboard for the live grid and planner metrics.
@@ -40,6 +41,8 @@ Limitations:
 
 - Classical planners still use the true simulator for rollout scoring.
 - Learned rollouts and learned MPC require PyTorch plus a local checkpoint.
+- Learned MPC executes only the first action of each candidate sequence, then replans from the next real state.
+- Later candidate actions are speculative learned rollouts and can still be visually noisy.
 - Held-out learned rollout and planner metrics are available through the API and CLI.
 
 ## Results Snapshot
@@ -70,6 +73,29 @@ See [docs/RESEARCH.md](docs/RESEARCH.md) for methodology, results, and limitatio
 The dashboard includes a multi-step drift view for comparing simulator frames, model predictions, and per-step error across imagined action sequences.
 
 ![DreamGrid multi-step drift](docs/assets/dreamgrid-multistep-drift.png)
+
+## Dashboard Planning Semantics
+
+The dashboard treats MPC as a receding-horizon controller:
+
+- **Next action** is the action that will be executed on the real grid.
+- **First** is the first action of one scored candidate.
+- **Rollout** is the remaining speculative sequence used only for scoring.
+- **Execute Planner Step** plans, executes one action, and then replans from the new real state.
+
+This distinction matters for `learned_mpc`: the world model can produce noisy multi-step imagined rollouts, while the first-action gate keeps the executed move consistent with the current rendered board when safe progress moves are visible.
+
+## Moving Hazards
+
+Moving hazards are part of the environment and evaluation suite, not a discarded experiment. They are used to stress planners that assume a static shortest path.
+
+- `GridRescueEnv` moves hazards after each agent action.
+- Dataset generation includes nominal and `moving_hazards` scenarios.
+- Held-out evaluation includes `moving_hazards` and denser-wall stress cases.
+- A* is intentionally not time-aware, so it can collide when a shortest static path crosses a moving hazard.
+- CEM handles moving hazards through simulator rollout; learned MPC handles them only through the trained world model plus visible first-action checks.
+
+The remaining research gap is better time-aware and uncertainty-aware hazard planning, not basic hazard implementation.
 
 ## Quick Start
 

@@ -4,6 +4,8 @@
 
 DreamGrid currently has a complete simulator/planner/dashboard MVP plus a trained latent world-model checkpoint. Learned rollout inspection, aggregate oracle-vs-learned metrics, and held-out split evaluation are available through the API.
 
+Moving hazards are implemented and are part of the default stress-testing story. The remaining gap is stronger time-aware planning and hazard-prediction diagnostics, not basic hazard support.
+
 ## Phase 1: Working Lab
 
 - [x] Implement deterministic `GridRescueEnv` with seeded map generation.
@@ -28,11 +30,14 @@ DreamGrid currently has a complete simulator/planner/dashboard MVP plus a traine
 - [x] Export metrics tables and failure cases.
 - [x] Replay held-out failure cases.
 - [x] Export rollout GIFs.
+- [x] Add learned MPC first-action gating from the current rendered board.
 
 ## Phase 4: Frontier Extensions
 
 - [ ] Add multi-objective checkpoint selection for planner score and rollout fidelity.
 - [ ] Add periodic checkpointing/resume support for long local training runs.
+- [ ] Add time-expanded A* or another hazard-aware oracle baseline.
+- [ ] Track hazard-motion prediction accuracy separately from aggregate frame MSE.
 - [ ] Ensemble world models for uncertainty-aware planning.
 - [ ] Partial observability with recurrent latent dynamics.
 - [ ] Domain randomization across visual themes.

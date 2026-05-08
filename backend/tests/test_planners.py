@@ -159,16 +159,95 @@ def test_learned_mpc_action_prior_penalizes_hazard_near_target() -> None:
     assert risky.action_scores[1] < clear.action_scores[1]
 
 
+def test_learned_mpc_first_action_gate_blocks_walls_and_prefers_progress() -> None:
+    adjustments = LearnedMPCPlanner._first_action_adjustments(
+        _synthetic_frame(
+            agent=(1, 1),
+            goal=(14, 14),
+            walls=[(0, 1), (1, 0)],
+        )
+    )
+
+    assert adjustments is not None
+    assert adjustments[0] <= -LearnedMPCPlanner._FIRST_ACTION_INVALID_PENALTY
+    assert adjustments[2] <= -LearnedMPCPlanner._FIRST_ACTION_INVALID_PENALTY
+    assert adjustments[1] > adjustments[4]
+    assert adjustments[3] > adjustments[4]
+
+
+def test_learned_mpc_first_action_gate_penalizes_away_moves_when_progress_exists() -> None:
+    adjustments = LearnedMPCPlanner._first_action_adjustments(
+        _synthetic_frame(agent=(1, 2), goal=(14, 14), walls=[(0, 2)])
+    )
+
+    assert adjustments is not None
+    assert adjustments[2] < adjustments[1]
+    assert adjustments[2] < adjustments[3]
+
+
+def test_learned_mpc_first_action_gate_does_not_prefer_direct_hazard() -> None:
+    gate = LearnedMPCPlanner._first_action_gate(
+        _synthetic_frame(
+            agent=(3, 2),
+            goal=(14, 14),
+            hazards=[(3, 3)],
+            walls=[(4, 2)],
+        )
+    )
+
+    assert gate is not None
+    assert 3 not in gate.preferred_actions
+    assert 0 in gate.preferred_actions
+    assert 2 in gate.preferred_actions
+
+
+@pytest.mark.parametrize(
+    ("seed", "setup_actions", "expected_actions"),
+    [
+        (8, [], {1, 3}),
+        (15, [3], {1, 3}),
+        (37, [], {3}),
+    ],
+)
+def test_learned_mpc_avoids_known_bad_first_actions(
+    seed: int,
+    setup_actions: list[int],
+    expected_actions: set[int],
+) -> None:
+    try:
+        require_torch()
+    except TorchUnavailableError:
+        pytest.skip("train extra is required for learned MPC")
+    if not DEFAULT_MODEL_PATH.exists():
+        pytest.skip("default learned-model checkpoint is not available")
+
+    env = GridRescueEnv(grid_size=16)
+    env.reset(seed=seed)
+    for action in setup_actions:
+        env.step(action)
+
+    plan = LearnedMPCPlanner(
+        horizon=6,
+        num_candidates=128,
+        seed=env.seed + env.step_count,
+    ).plan(env)
+
+    assert plan.selected_action in expected_actions
+
+
 def _synthetic_frame(
     *,
     agent: tuple[int, int],
     goal: tuple[int, int],
     hazards: list[tuple[int, int]] | None = None,
+    walls: list[tuple[int, int]] | None = None,
     grid_size: int = 16,
     tile_pixels: int = 4,
 ) -> np.ndarray:
     frame = np.zeros((grid_size * tile_pixels, grid_size * tile_pixels, 3), dtype=np.uint8)
     frame[:, :] = GridRescueEnv.palette["floor"]
+    for wall in walls or []:
+        _paint_tile(frame, wall, GridRescueEnv.palette["wall"], tile_pixels)
     for hazard in hazards or []:
         _paint_tile(frame, hazard, GridRescueEnv.palette["hazard"], tile_pixels)
     _paint_tile(frame, goal, GridRescueEnv.palette["goal"], tile_pixels)

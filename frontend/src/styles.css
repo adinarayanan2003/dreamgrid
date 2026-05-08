@@ -231,6 +231,32 @@ button:disabled {
   min-height: 230px;
 }
 
+.selected-action {
+  align-items: center;
+  background: #eef6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  color: #1e3a8a;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  min-height: 42px;
+  padding: 8px 10px;
+}
+
+.selected-action span {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.selected-action strong {
+  font-size: 18px;
+  line-height: 1;
+}
+
 .candidate-list {
   display: grid;
   gap: 8px;
@@ -261,7 +287,49 @@ button:disabled {
   white-space: nowrap;
 }
 
-.actions {
+.candidate-actions {
+  align-items: stretch;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(92px, 0.2fr) 1fr;
+}
+
+.candidate-action-primary,
+.candidate-tail {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  min-width: 0;
+  padding: 8px;
+}
+
+.candidate-action-primary {
+  display: grid;
+  gap: 4px;
+  place-items: center;
+  text-align: center;
+}
+
+.candidate-action-primary span,
+.candidate-tail span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.candidate-action-primary strong {
+  color: #0f766e;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.candidate-tail {
+  display: grid;
+  gap: 4px;
+}
+
+.candidate-tail div {
   color: #334155;
   font-size: 12px;
   line-height: 1.4;
