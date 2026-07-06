@@ -2,7 +2,6 @@ from fastapi.testclient import TestClient
 
 from dreamgrid.api import app
 
-
 def test_episode_generate_and_plan() -> None:
     client = TestClient(app)
     response = client.post("/api/episodes/generate", json={"grid_size": 12, "seed": 3})
